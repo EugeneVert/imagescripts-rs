@@ -12,9 +12,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args_ind;
     if ["cmds", "size"].contains(&selector_module) {
-        args_ind = 2;
+        args_ind = 1;
     } else {
-        args_ind = 3;
+        args_ind = 2;
     }
 
     let args4module = args[args_ind..args.len()].to_vec();
