@@ -1,9 +1,7 @@
 use clap::{App, Arg};
 use core::{mem::size_of_val, time::Duration};
 use image::GenericImageView;
-use std::{
-    error::Error, ffi::OsString, fs::read, iter::Enumerate, path::Path, process, time::Instant,
-};
+use std::{convert::TryFrom, error::Error, ffi::OsString, fs::read, iter::Enumerate, path::Path, process, str::FromStr, time::Instant};
 
 type BytesIO = Vec<u8>;
 
@@ -60,6 +58,9 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         let buff_bpp = (buff_filesize * 8) / px_count;
         let percentage_of_original = format!("{:.2}", (100 * buff_filesize / img_filesize));
         println!("{:?}", percentage_of_original);
+        // print(
+        //         f"{bite2size(img_filesize)} --> {bite2size(buff_filesize)} {buff_bpp}bpp  {'%.2f' % buff.ex_time}s  " +
+        //         f"{percentage_of_original}%", attrs=['underline'])
     }
 
     Ok(())
@@ -87,6 +88,10 @@ impl ImageBuffer {
         size_of_val(&self.image)
     }
 
+    fn set_ext(&mut self, i: &str) {
+        self.ext = String::from_str(i).unwrap();
+    }
+
     fn image_generate(&mut self, img_path: &str) {
         let cmd_arg = self.cmd.split_once(":").expect("Cmd argument error").0;
         let time_start = Instant::now();
@@ -112,6 +117,7 @@ impl ImageBuffer {
             .unwrap();
 
         self.image = read(buffer.path()).unwrap();
+        self.set_ext("jxl");
         buffer.close().unwrap();
     }
 }
