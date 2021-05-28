@@ -1,7 +1,11 @@
+// TODO: piping input file list, for image in input, csv output, dry run;
+
 use clap::{App, Arg};
 use core::{mem::size_of_val, time::Duration};
 use image::GenericImageView;
-use std::{convert::TryFrom, error::Error, ffi::OsString, fs::read, iter::Enumerate, path::Path, process, str::FromStr, time::Instant};
+use std::{
+    error::Error, ffi::OsString, fs::read, io::Write, path::Path, process, str::FromStr, time::Instant,
+};
 
 type BytesIO = Vec<u8>;
 
@@ -9,6 +13,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     // if args.is_empty() {
     //     args = std::env::args_os().collect();
     // }
+    #[rustfmt::skip]
     let matches = App::new("imagescripts-rs")
         .about(" ")
         .arg(
@@ -33,10 +38,19 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
                 .takes_value(true)
                 .required(true),
         )
-        .arg(Arg::with_name("save_all").long("save").takes_value(false))
+        .arg(
+            Arg::with_name("save_all")
+                .long("save")
+                .takes_value(false)
+            )
+        .arg(
+            Arg::with_name("tolerance")
+                .long("tolerance")
+                .short("t")
+                .takes_value(true)
+                .default_value("10")  // %
+        )
         .get_matches_from(args);
-
-    println!("{:?}", matches);
 
     let img = "./test.png";
     let img_image = image::open(img)?;
@@ -51,22 +65,71 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let img_filesize = Path::new(img).metadata().unwrap().len() as u32;
     let img_dimensions = img_image.dimensions();
     let px_count = img_dimensions.0 * img_dimensions.1;
-    let m = 0;
+
+    let mut res_filesize: u32 = 0;
+    let mut res_buff = ImageBuffer::new("");
 
     for (i, buff) in enc_img_buffers.iter().enumerate() {
-        let buff_filesize = buff.get_size() as u32;
-        let buff_bpp = (buff_filesize * 8) / px_count;
+        let buff_filesize = buff.get_image_size() as u32;
+        let buff_bpp = (buff_filesize * 8) as f64 / px_count as f64;
         let percentage_of_original = format!("{:.2}", (100 * buff_filesize / img_filesize));
-        println!("{:?}", percentage_of_original);
-        // print(
-        //         f"{bite2size(img_filesize)} --> {bite2size(buff_filesize)} {buff_bpp}bpp  {'%.2f' % buff.ex_time}s  " +
-        //         f"{percentage_of_original}%", attrs=['underline'])
+        println!(
+            "{} --> {}\t{:.2}bpp\t{:.2}s\t{}%",
+            byte2size(img_filesize as u64),
+            byte2size(buff_filesize as u64),
+            buff_bpp,
+            buff.ex_time.as_secs_f32(),
+            percentage_of_original
+        );
+
+        if matches.is_present("save_all") {
+            if buff_filesize == 0 {
+                continue;
+            }
+            let save_path = format!(
+                "{}/{}_{}.{}",
+                matches.value_of("out_dir").unwrap(),
+                Path::new(img).file_stem().unwrap().to_str().unwrap(),
+                i.to_string(),
+                buff.ext
+            );
+            let mut f = std::fs::File::create(save_path)?;
+            f.write_all(&buff.image[..]).unwrap();
+            continue;
+        }
+
+        let tolerance = matches
+            .value_of("tolerance")
+            .unwrap()
+            .parse::<f64>()
+            .unwrap(); // %
+                       // Commands has value tolerance over next ones
+        if (res_filesize == 0
+            || (buff_filesize as f64) < (res_filesize as f64) * (1.0 - tolerance * 0.01))
+            && buff_filesize != 0
+        {
+            res_buff = buff.clone();
+            res_filesize = buff_filesize;
+        }
     }
+
+    if matches.is_present("save_all") {
+        return Ok(());
+    }
+
+    let save_path = format!(
+        "{}/{}.{}",
+        matches.value_of("out_dir").unwrap(),
+        Path::new(img).file_stem().unwrap().to_str().unwrap(),
+        res_buff.ext
+    );
+    let mut f = std::fs::File::create(save_path)?;
+    f.write_all(&res_buff.image[..]).unwrap();
 
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ImageBuffer {
     image: BytesIO,
     cmd: String,
@@ -84,8 +147,8 @@ impl ImageBuffer {
         }
     }
 
-    fn get_size(&self) -> usize {
-        size_of_val(&self.image)
+    fn get_image_size(&self) -> usize {
+        size_of_val(&self.image[..])
     }
 
     fn set_ext(&mut self, i: &str) {
@@ -120,4 +183,15 @@ impl ImageBuffer {
         self.set_ext("jxl");
         buffer.close().unwrap();
     }
+}
+
+fn byte2size(num: u64) -> String {
+    let mut num_f = num as f64;
+    for unit in ["", "K", "M", "G"].iter() {
+        if num_f < 1024.0 {
+            return format!("{:3.1}{}iB", num_f, unit);
+        }
+        num_f /= 1024.0;
+    }
+    return format!("{:3.1}TiB", num_f);
 }
