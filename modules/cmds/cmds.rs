@@ -1,4 +1,4 @@
-// TODO: piping input file list, for image in input, csv output, dry run;
+// TODO: piping input file list, for image in input, dry run;
 
 use clap::{App, Arg};
 use core::{mem::size_of_val, time::Duration};
@@ -44,6 +44,11 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
                 .takes_value(false)
             )
         .arg(
+            Arg::with_name("save_csv")
+                .long("csv")
+                .takes_value(false)
+            )
+        .arg(
             Arg::with_name("tolerance")
                 .long("tolerance")
                 .short("t")
@@ -54,7 +59,28 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
     let img = "./test.png";
     let img_image = image::open(img)?;
+    let csv_path = "./res.csv";
 
+    if matches.is_present("save_csv") {
+        let csv_file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(true)
+        .open(csv_path)
+        .unwrap();
+        // let mut csv_writer = csv::Writer::from_writer(csv_file);
+        let mut csv_writer = csv::WriterBuilder::new()
+        .delimiter(b'\t')
+        .from_writer(csv_file);
+        let mut csv_row = Vec::from(["", "",]);
+        for cmd in matches.values_of("cmds").unwrap() {
+            csv_row.push(cmd);
+        }
+        csv_writer.write_record(csv_row)?;
+        csv_writer.flush()?;
+    }
+
+        // TODO for i in images
     let mut enc_img_buffers = Vec::<ImageBuffer>::new();
     for cmd in matches.values_of("cmds").unwrap() {
         let mut buff = ImageBuffer::new(cmd);
@@ -69,6 +95,24 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let mut res_filesize: u32 = 0;
     let mut res_buff = ImageBuffer::new("");
 
+
+    let save_csv = matches.is_present("save_csv");
+    let mut csv_row = Vec::<String>::new();
+    let csv_writer =  if save_csv {
+        let csv_file = std::fs::OpenOptions::new()
+        .write(true)
+        .append(true)
+        .open(csv_path)
+        .unwrap();
+        csv_row.push(img.to_string());
+        csv_row.push(img_filesize.to_string());
+        Some(csv::WriterBuilder::new()
+            .delimiter(b'\t')
+            .from_writer(csv_file))
+    } else {
+        None
+    };
+
     for (i, buff) in enc_img_buffers.iter().enumerate() {
         let buff_filesize = buff.get_image_size() as u32;
         let buff_bpp = (buff_filesize * 8) as f64 / px_count as f64;
@@ -82,6 +126,11 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
             percentage_of_original
         );
 
+
+        if save_csv {
+            csv_row.push(buff_filesize.to_string());
+        }
+        
         if matches.is_present("save_all") {
             if buff_filesize == 0 {
                 continue;
@@ -111,6 +160,12 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
             res_buff = buff.clone();
             res_filesize = buff_filesize;
         }
+    }
+
+    if save_csv {
+        let mut w = csv_writer.unwrap();
+        w.write_record(csv_row)?;
+        w.flush()?;
     }
 
     if matches.is_present("save_all") {
