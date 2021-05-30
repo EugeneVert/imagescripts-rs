@@ -1,12 +1,14 @@
-// TODO: piping input file list, for image in input, dry run;
+// TODO: piping input file list, dry run;
 
-use clap::{App, Arg, ArgMatches};
 use core::{mem::size_of_val, time::Duration};
-use image::GenericImageView;
 use std::{
     error::Error, ffi::OsString, fs::read, io::Write, path::Path, process, str::FromStr,
     time::Instant,
 };
+
+use image::GenericImageView;
+use rayon::iter::{ParallelBridge, ParallelIterator};
+use structopt::StructOpt;
 
 type BytesIO = Vec<u8>;
 
@@ -14,57 +16,18 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     // if args.is_empty() {
     //     args = std::env::args_os().collect();
     // }
-    #[rustfmt::skip]
-    let matches = App::new("imagescripts-rs")
-        .about(" ")
-        .arg(
-            Arg::with_name("input")
-                .takes_value(true)
-                .multiple(true)
-                .required(false)
-                .default_value(".")
-                .display_order(0),
-        )
-        .arg(
-            Arg::with_name("out_dir")
-                .short("o")
-                .takes_value(true)
-                .required(false)
-                .default_value("./out")
-                .display_order(0),
-        )
-        .arg(
-            Arg::with_name("cmds")
-                .short("c")
-                .multiple(true)
-                .takes_value(true)
-                .required(true),
-        )
-        .arg(
-            Arg::with_name("save_all")
-                .long("save")
-                .takes_value(false)
-            )
-        .arg(
-            Arg::with_name("save_csv")
-                .long("csv")
-                .takes_value(false)
-            )
-        .arg(
-            Arg::with_name("tolerance")
-                .long("tolerance")
-                .short("t")
-                .takes_value(true)
-                .default_value("10")  // %
-        )
-        .get_matches_from(args);
 
-    // let img = "./test.png";  PRUNE
+    let opt = Opt::from_iter(args);
+
     let csv_path = "./res.csv";
+    let images = &opt.input;
 
-    let images = matches.values_of("input").unwrap();
+    if !Path::new(&opt.out_dir).exists() {
+        std::fs::create_dir_all(&opt.out_dir)
+            .unwrap_or_else(|_| panic!("Error creating dir {}", &opt.out_dir));
+    }
 
-    if matches.is_present("save_csv") {
+    if opt.save_csv {
         let csv_file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -76,29 +39,54 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
             .delimiter(b'\t')
             .from_writer(csv_file);
         let mut csv_row = Vec::from(["", ""]);
-        for cmd in matches.values_of("cmds").unwrap() {
+        for cmd in &opt.cmds {
             csv_row.push(cmd);
         }
         csv_writer.write_record(csv_row)?;
         csv_writer.flush()?;
     }
 
-    for img in images {
-        process_image(img, csv_path, &matches)?;
-    }
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(opt.nproc)
+        .build_global()?;
+    images
+        .iter()
+        .par_bridge()
+        .for_each(|img| process_image(&img, csv_path, &opt).unwrap());
 
     Ok(())
 }
 
-fn process_image(img: &str, csv_path: &str, matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
+#[derive(StructOpt, Debug)]
+#[structopt(name = "imagescripts-rs", about = " ")]
+struct Opt {
+    #[structopt(required = false, default_value = "./*", display_order = 0)]
+    input: Vec<String>,
+    #[structopt(short, takes_value = true, default_value = "./out")]
+    out_dir: String,
+    #[structopt(short)]
+    cmds: Vec<String>,
+    #[structopt(short, long, default_value = "10")]
+    tolerance: u32,
+    #[structopt(long = "save")]
+    save_all: bool,
+    #[structopt(long = "csv")]
+    save_csv: bool,
+    #[structopt(long, default_value = "0")]
+    nproc: usize,
+}
+
+fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Error>> {
     let img_image = image::open(img)?;
     let img_filesize = Path::new(img).metadata().unwrap().len() as u32;
     let img_dimensions = img_image.dimensions();
     let px_count = img_dimensions.0 * img_dimensions.1;
 
+    let out_dir = &opt.out_dir;
+
     let mut enc_img_buffers = Vec::<ImageBuffer>::new();
-    for cmd in matches.values_of("cmds").unwrap() {
-        let mut buff = ImageBuffer::new(cmd);
+    for cmd in &opt.cmds {
+        let mut buff = ImageBuffer::new(&cmd);
         buff.image_generate(&img);
         enc_img_buffers.push(buff);
     }
@@ -107,7 +95,7 @@ fn process_image(img: &str, csv_path: &str, matches: &ArgMatches) -> Result<(), 
     let mut res_buff = ImageBuffer::new("");
 
     // if save_csv
-    let save_csv = matches.is_present("save_csv");
+    let save_csv = opt.save_csv;
     let mut csv_row = Vec::<String>::new();
     let csv_writer = if save_csv {
         let csv_file = std::fs::OpenOptions::new()
@@ -145,13 +133,13 @@ fn process_image(img: &str, csv_path: &str, matches: &ArgMatches) -> Result<(), 
             csv_row.push(buff_filesize.to_string());
         }
 
-        if matches.is_present("save_all") {
+        if opt.save_all {
             if buff_filesize == 0 {
                 continue;
             }
             let save_path = format!(
                 "{}/{}_{}.{}",
-                matches.value_of("out_dir").unwrap(),
+                out_dir,
                 Path::new(img).file_stem().unwrap().to_str().unwrap(),
                 i.to_string(),
                 buff.ext
@@ -161,12 +149,8 @@ fn process_image(img: &str, csv_path: &str, matches: &ArgMatches) -> Result<(), 
             continue;
         }
 
-        let tolerance = matches
-            .value_of("tolerance")
-            .unwrap()
-            .parse::<f64>()
-            .unwrap(); // %
-                       // Commands has value tolerance over next ones
+        let tolerance = opt.tolerance as f64; // %
+                                              // Commands has value tolerance over next ones
         if (res_filesize == 0
             || (buff_filesize as f64) < (res_filesize as f64) * (1.0 - tolerance * 0.01))
             && buff_filesize != 0
@@ -182,12 +166,12 @@ fn process_image(img: &str, csv_path: &str, matches: &ArgMatches) -> Result<(), 
         w.flush()?;
     }
 
-    if matches.is_present("save_all") {
+    if opt.save_all {
         return Ok(());
     }
     let save_path = format!(
         "{}/{}.{}",
-        matches.value_of("out_dir").unwrap(),
+        out_dir,
         Path::new(img).file_stem().unwrap().to_str().unwrap(),
         res_buff.ext
     );
