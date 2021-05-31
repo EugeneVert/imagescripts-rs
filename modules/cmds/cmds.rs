@@ -35,16 +35,16 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     // if args.is_empty() {
     //     args = std::env::args_os().collect();
     // }
-
     let opt = Opt::from_iter(args);
 
     let csv_path = "./res.csv";
+
     let mut images = opt.input.to_owned();
     if images.get(0).unwrap() == "./*" {
         images_get_from_cwd(&mut images);
     }
-    println!("{:?}", images);
 
+    // Create output dir
     if !Path::new(&opt.out_dir).exists() {
         std::fs::create_dir_all(&opt.out_dir)
             .unwrap_or_else(|_| panic!("Error creating dir {}", &opt.out_dir));
@@ -72,13 +72,16 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     rayon::ThreadPoolBuilder::new()
         .num_threads(opt.nproc)
         .build_global()?;
+
     images
         .iter()
         .par_bridge()
         .for_each(|img| process_image(&img, csv_path, &opt).unwrap());
+
     Ok(())
 }
 
+/// Gather image-files from cwd, remove 1'st element from input Vec
 fn images_get_from_cwd(images: &mut Vec<String>) {
     let image_formats = ["png", "jpg", "webp"];
     images.append(
@@ -92,6 +95,7 @@ fn images_get_from_cwd(images: &mut Vec<String>) {
     images.retain(|i| image_formats.iter().any(|&format| i.ends_with(format)));
 }
 
+/// Generate results from cmds and compare/save/output them
 fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Error>> {
     let img_image = image::open(img)?;
     let img_filesize = Path::new(img).metadata().unwrap().len() as u32;
@@ -100,6 +104,7 @@ fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Err
 
     let out_dir = &opt.out_dir;
 
+    // generate results in ImageBuffers for each cmd
     let mut enc_img_buffers = Vec::<ImageBuffer>::new();
     for cmd in &opt.cmds {
         let mut buff = ImageBuffer::new(&cmd);
@@ -110,7 +115,7 @@ fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Err
     let mut res_filesize: u32 = 0;
     let mut res_buff = ImageBuffer::new("");
 
-    // if save_csv
+    // csv
     let save_csv = opt.save_csv;
     let mut csv_row = Vec::<String>::new();
     let csv_writer = if save_csv {
@@ -129,8 +134,8 @@ fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Err
     } else {
         None
     };
-    // //
 
+    // Caclculate & print info for each ImageBuffer
     println!("{}", &img);
     for (i, buff) in enc_img_buffers.iter().enumerate() {
         let buff_filesize = buff.get_image_size() as u32;
@@ -185,6 +190,7 @@ fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Err
     if opt.save_all {
         return Ok(());
     }
+    // save res
     let save_path = format!(
         "{}/{}.{}",
         out_dir,
@@ -224,7 +230,7 @@ impl ImageBuffer {
     }
 
     fn image_generate(&mut self, img_path: &str) {
-        let (cmd_cmd, cmd_args) = self.cmd.split_once(":").expect("Cmd argument error");
+        let cmd_cmd = self.cmd.split_once(":").expect("Cmd argument error").0;
         // for i in cmd_args {
         //     match i {
         //         "alpha" =>
@@ -247,14 +253,20 @@ impl ImageBuffer {
             .suffix(&format!(".{}", ext))
             .tempfile()
             .unwrap();
-        let cmd_args = self.cmd.split_once(":").unwrap().1;
+        let mut cmd_args: Vec<&str> = self.cmd.split_once(":").unwrap().1.split(' ').collect();
+
+        // no arguments -> return None
+        if cmd_args.contains(&"") {
+            cmd_args.pop();
+        }
 
         process::Command::new(cmd)
             .arg(img_path)
-            .args(cmd_args.split(' '))
+            .args(cmd_args)
             .arg(buffer.path())
             .output()
             .unwrap();
+        // println!("{}", std::str::from_utf8(&output.stderr).unwrap());
 
         self.image = read(buffer.path()).unwrap();
         self.set_ext(ext);
@@ -262,9 +274,10 @@ impl ImageBuffer {
     }
 }
 
-struct ImageBufferGenOptions {
-    has_alpha: bool,
-}
+// TODO
+// struct ImageBufferGenOptions {
+//     has_alpha: bool,
+// }
 
 fn byte2size(num: u64) -> String {
     let mut num_f = num as f64;
