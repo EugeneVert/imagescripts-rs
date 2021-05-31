@@ -12,6 +12,25 @@ use structopt::StructOpt;
 
 type BytesIO = Vec<u8>;
 
+#[derive(StructOpt, Debug)]
+#[structopt(name = "imagescripts-rs", about = " ")]
+struct Opt {
+    #[structopt(required = false, default_value = "./*", display_order = 0)]
+    input: Vec<String>,
+    #[structopt(short, takes_value = true, default_value = "./out")]
+    out_dir: String,
+    #[structopt(short)]
+    cmds: Vec<String>,
+    #[structopt(short, long, default_value = "10")]
+    tolerance: u32,
+    #[structopt(long = "save")]
+    save_all: bool,
+    #[structopt(long = "csv")]
+    save_csv: bool,
+    #[structopt(long, default_value = "0")]
+    nproc: usize,
+}
+
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     // if args.is_empty() {
     //     args = std::env::args_os().collect();
@@ -20,7 +39,11 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_iter(args);
 
     let csv_path = "./res.csv";
-    let images = &opt.input;
+    let mut images = opt.input.to_owned();
+    if images.get(0).unwrap() == "./*" {
+        images_get_from_cwd(&mut images);
+    }
+    println!("{:?}", images);
 
     if !Path::new(&opt.out_dir).exists() {
         std::fs::create_dir_all(&opt.out_dir)
@@ -53,27 +76,20 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         .iter()
         .par_bridge()
         .for_each(|img| process_image(&img, csv_path, &opt).unwrap());
-
     Ok(())
 }
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "imagescripts-rs", about = " ")]
-struct Opt {
-    #[structopt(required = false, default_value = "./*", display_order = 0)]
-    input: Vec<String>,
-    #[structopt(short, takes_value = true, default_value = "./out")]
-    out_dir: String,
-    #[structopt(short)]
-    cmds: Vec<String>,
-    #[structopt(short, long, default_value = "10")]
-    tolerance: u32,
-    #[structopt(long = "save")]
-    save_all: bool,
-    #[structopt(long = "csv")]
-    save_csv: bool,
-    #[structopt(long, default_value = "0")]
-    nproc: usize,
+fn images_get_from_cwd(images: &mut Vec<String>) {
+    let image_formats = ["png", "jpg", "webp"];
+    images.append(
+        &mut Path::new(".")
+            .read_dir()
+            .unwrap()
+            .map(|dir| dir.unwrap().path().into_os_string().into_string().unwrap())
+            .collect::<Vec<String>>(),
+    );
+    images.remove(0);
+    images.retain(|i| image_formats.iter().any(|&format| i.ends_with(format)));
 }
 
 fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Error>> {
@@ -208,23 +224,32 @@ impl ImageBuffer {
     }
 
     fn image_generate(&mut self, img_path: &str) {
-        let cmd_arg = self.cmd.split_once(":").expect("Cmd argument error").0;
+        let (cmd_cmd, cmd_args) = self.cmd.split_once(":").expect("Cmd argument error");
+        // for i in cmd_args {
+        //     match i {
+        //         "alpha" =>
+        //     }
+        // }
         let time_start = Instant::now();
-        match cmd_arg {
+        match cmd_cmd {
             "image" => {}
-            "cjxl" => self.gen_jxl(img_path),
+            "cjxl" => self.gen_from_cmd(img_path, "cjxl", "jxl"),
+            "avif" => self.gen_from_cmd(img_path, "avifenc", "avif"),
             _ => {
-                panic!("match error")
+                panic!("match error, cmd '{}' not supported", &cmd_cmd)
             }
         }
         self.ex_time = time_start.elapsed();
     }
 
-    fn gen_jxl(&mut self, img_path: &str) {
-        let buffer = tempfile::Builder::new().suffix(".jxl").tempfile().unwrap();
+    fn gen_from_cmd(&mut self, img_path: &str, cmd: &str, ext: &str) {
+        let buffer = tempfile::Builder::new()
+            .suffix(&format!(".{}", ext))
+            .tempfile()
+            .unwrap();
         let cmd_args = self.cmd.split_once(":").unwrap().1;
 
-        process::Command::new("cjxl")
+        process::Command::new(cmd)
             .arg(img_path)
             .args(cmd_args.split(' '))
             .arg(buffer.path())
@@ -232,9 +257,13 @@ impl ImageBuffer {
             .unwrap();
 
         self.image = read(buffer.path()).unwrap();
-        self.set_ext("jxl");
+        self.set_ext(ext);
         buffer.close().unwrap();
     }
+}
+
+struct ImageBufferGenOptions {
+    has_alpha: bool,
 }
 
 fn byte2size(num: u64) -> String {

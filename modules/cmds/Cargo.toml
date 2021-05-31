@@ -1,6 +1,6 @@
 [package]
 name = "cmds"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Eugene Vert"]
 edition = "2018"
 
