@@ -1,16 +1,13 @@
 // TODO: piping input file list, dry run;
 
-use core::{mem::size_of_val, time::Duration};
-use std::{
-    error::Error, ffi::OsString, fs::read, io::Write, path::Path, process, str::FromStr,
-    time::Instant,
-};
+use std::{error::Error, ffi::OsString, io::Write, path::Path, str::FromStr};
 
 use image::GenericImageView;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use structopt::StructOpt;
 
 type BytesIO = Vec<u8>;
+
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "imagescripts-rs", about = " ")]
@@ -208,7 +205,7 @@ struct ImageBuffer {
     image: BytesIO,
     cmd: String,
     ext: String,
-    ex_time: Duration,
+    ex_time: core::time::Duration,
 }
 
 impl ImageBuffer {
@@ -217,12 +214,12 @@ impl ImageBuffer {
             image: Vec::new(),
             cmd: String::from(cmd_in),
             ext: String::new(),
-            ex_time: Duration::new(0, 0),
+            ex_time: core::time::Duration::new(0, 0),
         }
     }
 
     fn get_image_size(&self) -> usize {
-        size_of_val(&self.image[..])
+        core::mem::size_of_val(&self.image[..])
     }
 
     fn set_ext(&mut self, i: &str) {
@@ -236,7 +233,7 @@ impl ImageBuffer {
         //         "alpha" =>
         //     }
         // }
-        let time_start = Instant::now();
+        let time_start = std::time::Instant::now();
         match cmd_cmd {
             "image" => {}
             "cjxl" => self.gen_from_cmd(img_path, "cjxl", "jxl"),
@@ -260,7 +257,7 @@ impl ImageBuffer {
             cmd_args.pop();
         }
 
-        process::Command::new(cmd)
+        std::process::Command::new(cmd)
             .arg(img_path)
             .args(cmd_args)
             .arg(buffer.path())
@@ -268,7 +265,7 @@ impl ImageBuffer {
             .unwrap();
         // println!("{}", std::str::from_utf8(&output.stderr).unwrap());
 
-        self.image = read(buffer.path()).unwrap();
+        self.image = std::fs::read(buffer.path()).unwrap();
         self.set_ext(ext);
         buffer.close().unwrap();
     }
