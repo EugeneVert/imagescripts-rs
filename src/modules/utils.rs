@@ -1,18 +1,22 @@
 use std::path::Path;
 
-pub fn ims_init(input: &mut Vec<String>, output_dir: &str, nproc: Option<usize>) {
+pub fn ims_init(input: &mut Vec<String>, output_dir: &std::path::Path, nproc: Option<usize>) {
     if input.get(0).unwrap() == "./*" {
         input_get_from_cwd(input);
     }
-    if !Path::new(&output_dir).exists() {
-        std::fs::create_dir_all(&output_dir)
-            .unwrap_or_else(|_| panic!("Error creating dir {}", &output_dir));
-    }
+    mkdir(output_dir);
     if let Some(n) = nproc {
         rayon::ThreadPoolBuilder::new()
             .num_threads(n)
             .build_global()
             .unwrap()
+    }
+}
+
+pub fn mkdir(dir: &std::path::Path) {
+    if !Path::new(dir).exists() {
+        std::fs::create_dir_all(dir)
+            .unwrap_or_else(|_| panic!("Error creating dir {}", dir.as_os_str().to_str().unwrap()));
     }
 }
 
