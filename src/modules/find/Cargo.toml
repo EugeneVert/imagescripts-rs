@@ -1,6 +1,6 @@
 [package]
-name = "cmds"
-version = "0.1.1"
+name = "find"
+version = "0.1.0"
 authors = ["Lilorien <lilorien@localhost.localdomain>"]
 edition = "2018"
 
@@ -10,12 +10,8 @@ edition = "2018"
 clap = "2"
 structopt = "0.3"
 
-rayon = "1.5"
-tempfile = "3"
-
 image = "0.23"
-csv = "1.1"
 
 [lib]
-name = "cmds"
-path = "cmds.rs"
+name = "find"
+path = "_mod.rs"
