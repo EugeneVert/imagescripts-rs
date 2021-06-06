@@ -1,5 +1,6 @@
 
 use std::ffi::OsString;
+use imagescripts_rs::modules;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<OsString> = std::env::args_os().collect();
@@ -24,14 +25,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match selector_module {
         "find" => {
             match selector_submodule {
-                "bpp" => bpp::main(args4module)?,
+                "bpp" => modules::find::bpp::main(args4module)?,
                 "resizeble" => {}
                 "samesize" => {}
                 "simmilar" => {}
                 _ => (),
             };
         }
-        "cmds" => cmds::main(args4module)?,
+        "cmds" => modules::cmds::main(args4module)?,
         "size" => {}
         _ => (),
     };
