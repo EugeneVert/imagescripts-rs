@@ -2,9 +2,11 @@
 
 use std::{error::Error, ffi::OsString, io::Write, path::Path, str::FromStr};
 
-use image::GenericImageView;
-use rayon::iter::{ParallelBridge, ParallelIterator};
 use structopt::StructOpt;
+use rayon::iter::{ParallelBridge, ParallelIterator};
+
+#[path = "utils.rs"]
+mod utils;
 
 type BytesIO = Vec<u8>;
 
@@ -37,15 +39,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let csv_path = "./res.csv";
 
     let mut images = opt.input.to_owned();
-    if images.get(0).unwrap() == "./*" {
-        images_get_from_cwd(&mut images);
-    }
-
-    // Create output dir
-    if !Path::new(&opt.out_dir).exists() {
-        std::fs::create_dir_all(&opt.out_dir)
-            .unwrap_or_else(|_| panic!("Error creating dir {}", &opt.out_dir));
-    }
+    utils::ims_init(&mut images, &opt.out_dir, Some(opt.nproc));
 
     if opt.save_csv {
         let csv_file = std::fs::OpenOptions::new()
@@ -78,25 +72,10 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Gather image-files from cwd, remove 1'st element from input Vec
-fn images_get_from_cwd(images: &mut Vec<String>) {
-    let image_formats = ["png", "jpg", "webp"];
-    images.append(
-        &mut Path::new(".")
-            .read_dir()
-            .unwrap()
-            .map(|dir| dir.unwrap().path().into_os_string().into_string().unwrap())
-            .collect::<Vec<String>>(),
-    );
-    images.remove(0);
-    images.retain(|i| image_formats.iter().any(|&format| i.ends_with(format)));
-}
-
 /// Generate results from cmds and compare/save/output them
 fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    let img_image = image::open(img)?;
     let img_filesize = Path::new(img).metadata().unwrap().len() as u32;
-    let img_dimensions = img_image.dimensions();
+    let img_dimensions = image::image_dimensions(&img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
 
     let out_dir = &opt.out_dir;
