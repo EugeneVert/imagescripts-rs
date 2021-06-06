@@ -12,9 +12,9 @@ struct Opt {
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<String>,
     #[structopt(short, conflicts_with = "bigger")]
-    lesser: Option<f64>,
+    lesser: Option<f32>,
     #[structopt(short, conflicts_with = "lesser")]
-    bigger: Option<f64>,
+    bigger: Option<f32>,
     #[structopt(short = "mv")]
     mv: bool,
     #[structopt(long, default_value = "0")]
@@ -50,7 +50,7 @@ fn process_image(img: &str, out_dir: &str, opt: &Opt) -> Result<(), Box<dyn Erro
     let img_filesize = Path::new(img).metadata().unwrap().len();
     let img_dimensions = image::image_dimensions(&img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
-    let img_bpp = (img_filesize * 8) as f64 / px_count as f64;
+    let img_bpp = (img_filesize * 8) as f32 / px_count as f32;
 
     println!("File: {}\n bpp: {:.3}", img, img_bpp);
     let mut save_flag: bool = false;
@@ -68,7 +68,11 @@ fn process_image(img: &str, out_dir: &str, opt: &Opt) -> Result<(), Box<dyn Erro
         }
     }
     if save_flag {
-        let save_path = format!("{}/{}", out_dir, Path::new(img).file_name().unwrap().to_str().unwrap());
+        let save_path = format!(
+            "{}/{}",
+            out_dir,
+            Path::new(img).file_name().unwrap().to_str().unwrap()
+        );
         std::fs::rename(img, save_path)?;
     }
 
