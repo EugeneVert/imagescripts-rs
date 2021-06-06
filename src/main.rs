@@ -26,15 +26,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "find" => {
             match selector_submodule {
                 "bpp" => modules::find::bpp::main(args4module)?,
+                "grayscale" => modules::find::grayscale::main(args4module)?,
                 "resizeble" => {}
                 "samesize" => {}
                 "simmilar" => {}
-                _ => (),
+                _ => (print_err()),
             };
         }
         "cmds" => modules::cmds::main(args4module)?,
         "size" => {}
-        _ => (),
+        _ => (print_err()),
     };
     Ok(())
+}
+
+fn print_err() {
+    println!("No such option")
 }
