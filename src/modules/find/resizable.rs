@@ -18,9 +18,9 @@ struct Opt {
     input: Vec<String>,
     #[structopt(short = "s", long = "size", required = false, default_value = "3508", display_order = 0)]
     px_size: u32,
-    #[structopt(short = "p")]
+    #[structopt(long = "p")]
     png_sort: bool,
-    #[structopt(short = "p:s")]
+    #[structopt(long = "p:s", default_value="1754")]
     png_px_size: u32,
     #[structopt(long, default_value = "0")]
     nproc: usize,
