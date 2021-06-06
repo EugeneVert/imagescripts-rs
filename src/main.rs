@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             match selector_submodule {
                 "bpp" => modules::find::bpp::main(args4module)?,
                 "grayscale" => modules::find::grayscale::main(args4module)?,
-                "resizeble" => {}
+                "resizeble" => modules::find::resizable::main(args4module)?,
                 "samesize" => {}
                 "simmilar" => {}
                 _ => (print_err()),
