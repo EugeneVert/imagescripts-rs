@@ -26,8 +26,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     //     args = std::env::args_os().collect();
     // }
     let opt = Opt::from_iter(args);
-    let out_dir = unwrap_two(opt.lesser, opt.lesser).to_string();
-
+    let out_dir = std::path::PathBuf::from(unwrap_two(opt.lesser, opt.lesser).to_string());
     let mut images = opt.input.to_owned();
     utils::ims_init(&mut images, &out_dir, Some(opt.nproc));
 
@@ -46,7 +45,7 @@ fn unwrap_two<T>(l: Option<T>, b: Option<T>) -> T {
     }
 }
 
-fn process_image(img: &str, out_dir: &str, opt: &Opt) -> Result<(), Box<dyn Error>> {
+fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
     let img_filesize = Path::new(img).metadata().unwrap().len();
     let img_dimensions = image::image_dimensions(&img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
@@ -68,11 +67,7 @@ fn process_image(img: &str, out_dir: &str, opt: &Opt) -> Result<(), Box<dyn Erro
         }
     }
     if save_flag {
-        let save_path = format!(
-            "{}/{}",
-            out_dir,
-            Path::new(img).file_name().unwrap().to_str().unwrap()
-        );
+        let save_path = out_dir.join(Path::new(img).file_name().unwrap());
         std::fs::rename(img, save_path)?;
     }
 

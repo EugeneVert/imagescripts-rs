@@ -2,14 +2,13 @@
 
 use std::{error::Error, ffi::OsString, io::Write, path::Path, str::FromStr};
 
-use structopt::StructOpt;
 use rayon::iter::{ParallelBridge, ParallelIterator};
+use structopt::StructOpt;
 
 #[path = "utils.rs"]
 mod utils;
 
 type BytesIO = Vec<u8>;
-
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "imagescripts-rs", about = " ")]
@@ -17,7 +16,7 @@ struct Opt {
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<String>,
     #[structopt(short, takes_value = true, default_value = "./out")]
-    out_dir: String,
+    out_dir: std::path::PathBuf,
     #[structopt(short)]
     cmds: Vec<String>,
     #[structopt(short, long, default_value = "10")]
@@ -134,13 +133,10 @@ fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Err
             if buff_filesize == 0 {
                 continue;
             }
-            let save_path = format!(
-                "{}/{}_{}.{}",
-                out_dir,
-                Path::new(img).file_stem().unwrap().to_str().unwrap(),
-                i.to_string(),
-                buff.ext
-            );
+            let save_path = out_dir
+                .join(Path::new(img).file_stem().unwrap())
+                .join(i.to_string())
+                .join(&buff.ext);
             let mut f = std::fs::File::create(save_path)?;
             f.write_all(&buff.image[..]).unwrap();
             continue;
@@ -167,12 +163,7 @@ fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Err
         return Ok(());
     }
     // save res
-    let save_path = format!(
-        "{}/{}.{}",
-        out_dir,
-        Path::new(img).file_stem().unwrap().to_str().unwrap(),
-        res_buff.ext
-    );
+    let save_path = out_dir.join(Path::new(img).file_stem().unwrap()).join(&res_buff.ext);
     let mut f = std::fs::File::create(save_path)?;
     f.write_all(&res_buff.image[..]).unwrap();
 

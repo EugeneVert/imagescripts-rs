@@ -1,3 +1,4 @@
+
 use std::{error::Error, ffi::OsString, path::Path};
 
 use rayon::iter::{ParallelBridge, ParallelIterator};
@@ -13,9 +14,9 @@ struct Opt {
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<String>,
     #[structopt(short, required = false, default_value = "./grayscale", display_order = 0)]
-    out_dir: String,
+    out_dir: std::path::PathBuf,
     #[structopt(short, default_value = "5")]
-    threshold: usize,
+    threshold: u32,
     #[structopt(long, default_value = "0")]
     nproc: usize,
 }
@@ -24,33 +25,29 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_iter(args);
 
     let mut images = opt.input.to_owned();
-    utils::ims_init(&mut images, &opt.out_dir, Some(opt.nproc));
+    utils::ims_init(&mut images, opt.out_dir.as_path(), Some(opt.nproc));
 
     images
         .iter()
         .par_bridge()
-        .for_each(|img| process_image(&img, &opt.out_dir, &opt).unwrap());
+        .for_each(|img| process_image(&img, opt.out_dir.as_path(), &opt).unwrap());
 
     Ok(())
 }
 
-fn process_image(img: &str, out_dir: &str, opt: &Opt) -> Result<(), Box<dyn Error>> {
+fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
     let img_image = image::open(&img)?;
 
     println!("File: {}", img);
     if !image_is_colorfull(img_image, opt.threshold) {
-        let save_path = format!(
-            "{}/{}",
-            out_dir,
-            Path::new(img).file_name().unwrap().to_str().unwrap()
-        );
+        let save_path = Path::new(out_dir).join(Path::new(img).file_name().unwrap());
         std::fs::rename(img, save_path)?;
     }
 
     Ok(())
 }
 
-fn image_is_colorfull(img: image::DynamicImage, threshold: usize) -> bool {
+fn image_is_colorfull(img: image::DynamicImage, threshold: u32) -> bool {
     let thumb_size = 32;
     if img.color().has_color() {
         let thumb = img.resize(thumb_size, thumb_size, image::imageops::Nearest);
