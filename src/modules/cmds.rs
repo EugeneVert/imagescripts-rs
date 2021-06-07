@@ -59,10 +59,6 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         csv_writer.flush()?;
     }
 
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(opt.nproc)
-        .build_global()?;
-
     images
         .iter()
         .par_bridge()
@@ -133,10 +129,12 @@ fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Err
             if buff_filesize == 0 {
                 continue;
             }
-            let save_path = out_dir
-                .join(Path::new(img).file_stem().unwrap())
-                .join(i.to_string())
-                .join(&buff.ext);
+            let save_path = out_dir.join(format!(
+                "{}_{}.{}",
+                Path::new(img).file_stem().unwrap().to_str().unwrap(),
+                i.to_string(),
+                &buff.ext
+            ));
             let mut f = std::fs::File::create(save_path)?;
             f.write_all(&buff.image[..]).unwrap();
             continue;
@@ -163,7 +161,11 @@ fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Err
         return Ok(());
     }
     // save res
-    let save_path = out_dir.join(Path::new(img).file_stem().unwrap()).join(&res_buff.ext);
+    let save_path = out_dir.join(format!(
+        "{}.{}",
+        Path::new(img).file_stem().unwrap().to_str().unwrap(),
+        &res_buff.ext
+    ));
     let mut f = std::fs::File::create(save_path)?;
     f.write_all(&res_buff.image[..]).unwrap();
 
