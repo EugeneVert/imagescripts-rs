@@ -44,6 +44,10 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         .par_bridge()
         .for_each(|img| process_image(&img, &paths, &opt).unwrap());
 
+    dir_del_if_empty(&paths.out_dir_png_size)?;
+    dir_del_if_empty(&paths.out_dir_png)?;
+    dir_del_if_empty(&paths.out_dir)?;
+
     Ok(())
 }
 
@@ -75,47 +79,14 @@ fn process_image(img: &str, paths: &Paths, opt: &Opt) -> Result<(), Box<dyn Erro
         std::fs::rename(img, to)?;
     }
 
-    // if !image_is_colorfull(img_image, opt.threshold) {
-    //     let save_path = format!(
-    //         "{}/{}",
-    //         out_dir,
-    //         Path::new(img).file_name().unwrap().to_str().unwrap()
-    //     );
-    //     std::fs::rename(img, save_path)?;
-    // }
-
     Ok(())
 }
 
-// fn image_is_colorfull(img: image::DynamicImage, threshold: usize) -> bool {
-//     let thumb_size = 32;
-//     if img.color().has_color() {
-//         let thumb = img.resize(thumb_size, thumb_size, image::imageops::Nearest);
+fn dir_del_if_empty(d: &Path) -> Result<(), Box<dyn Error>> {
+    if std::fs::read_dir(d)?.count() == 0 {
+        println!("Rm dir: {:?}", &d);
+        std::fs::remove_dir(d)?;
+    }
 
-//         let mut is_colorfull = false;
-//         let res = thumb
-//             .into_rgba8()
-//             .pixels()
-//             .par_bridge()
-//             .find_map_any(|pix| {
-//                 let pix = pix.0;
-//                 let pix_r = *pix.get(0).unwrap() as i32;
-//                 let pix_g = *pix.get(1).unwrap() as i32;
-//                 let pix_b = *pix.get(2).unwrap() as i32;
-//                 if std::cmp::max(
-//                     std::cmp::max((pix_r - pix_g).abs(), (pix_r - pix_b).abs()),
-//                     (pix_g - pix_b).abs(),
-//                 ) > threshold as i32
-//                 {
-//                     return Some(());
-//                 }
-//                 None
-//             });
-//         if res.is_some() {
-//             is_colorfull = true;
-//         }
-//         return is_colorfull;
-//     }
-//     //else
-//     true
-// }
+    Ok(())
+}
