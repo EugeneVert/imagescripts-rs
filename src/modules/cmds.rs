@@ -2,7 +2,7 @@
 
 use std::{error::Error, ffi::OsString, io::Write, path::Path, str::FromStr};
 
-use rayon::iter::{ParallelBridge, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use structopt::StructOpt;
 
 #[path = "utils.rs"]
@@ -59,16 +59,16 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         csv_writer.flush()?;
     }
 
-    images
-        .iter()
-        .par_bridge()
-        .for_each(|img| process_image(&img, csv_path, &opt).unwrap());
+    for img in images {
+        process_image(&img, csv_path, &opt)?;
+    }
 
     Ok(())
 }
 
 /// Generate results from cmds and compare/save/output them
 fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    println!("{}", &img);
     let img_filesize = Path::new(img).metadata().unwrap().len() as u32;
     let img_dimensions = image::image_dimensions(&img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
@@ -76,12 +76,15 @@ fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Err
     let out_dir = &opt.out_dir;
 
     // generate results in ImageBuffers for each cmd
-    let mut enc_img_buffers = Vec::<ImageBuffer>::new();
-    for cmd in &opt.cmds {
-        let mut buff = ImageBuffer::new(&cmd);
-        buff.image_generate(&img);
-        enc_img_buffers.push(buff);
-    }
+    let enc_img_buffers: Vec<ImageBuffer> = opt
+        .cmds
+        .par_iter()
+        .map(|cmd| {
+            let mut buff = ImageBuffer::new(&cmd);
+            buff.image_generate(&img);
+            buff
+        })
+        .collect();
 
     let mut res_filesize: u32 = 0;
     let mut res_buff = ImageBuffer::new("");
@@ -107,7 +110,6 @@ fn process_image(img: &str, csv_path: &str, opt: &Opt) -> Result<(), Box<dyn Err
     };
 
     // Caclculate & print info for each ImageBuffer
-    println!("{}", &img);
     for (i, buff) in enc_img_buffers.iter().enumerate() {
         let buff_filesize = buff.get_image_size() as u32;
         let buff_bpp = (buff_filesize * 8) as f64 / px_count as f64;
