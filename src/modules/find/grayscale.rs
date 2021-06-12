@@ -1,11 +1,9 @@
-
 use std::{error::Error, ffi::OsString, path::Path};
 
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use structopt::StructOpt;
 
-#[path = "../utils.rs"]
-mod utils;
+use crate::modules::utils;
 
 #[rustfmt::skip]
 #[derive(StructOpt, Debug)]
@@ -36,9 +34,9 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 }
 
 fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    println!("File: {}", img);
     let img_image = image::open(&img)?;
 
-    println!("File: {}", img);
     if !image_is_colorfull(img_image, opt.threshold) {
         let save_path = Path::new(out_dir).join(Path::new(img).file_name().unwrap());
         std::fs::rename(img, save_path)?;
@@ -50,10 +48,15 @@ fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), 
 fn image_is_colorfull(img: image::DynamicImage, threshold: u32) -> bool {
     let thumb_size = 32;
     if img.color().has_color() {
-        let thumb = img.resize(thumb_size, thumb_size, image::imageops::Nearest);
+        let thumb = image::imageops::resize(
+            &img.into_rgb8(),
+            thumb_size,
+            thumb_size,
+            image::imageops::Nearest,
+        );
 
         let mut is_colorfull = false;
-        let res = thumb.into_rgba8().pixels().par_bridge().find_map_any(|pix | {
+        let res = thumb.pixels().par_bridge().find_map_any(|pix| {
             let pix = pix.0;
             let pix_r = *pix.get(0).unwrap() as i32;
             let pix_g = *pix.get(1).unwrap() as i32;

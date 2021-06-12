@@ -7,8 +7,7 @@ use std::{
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use structopt::StructOpt;
 
-#[path = "../utils.rs"]
-mod utils;
+use crate::modules::utils;
 
 #[rustfmt::skip]
 #[derive(StructOpt, Debug)]

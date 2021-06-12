@@ -5,8 +5,7 @@ use std::{error::Error, ffi::OsString, io::Write, path::Path, str::FromStr};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use structopt::StructOpt;
 
-#[path = "utils.rs"]
-mod utils;
+use crate::modules::utils;
 
 type BytesIO = Vec<u8>;
 
@@ -244,11 +243,6 @@ impl ImageBuffer {
         buffer.close().unwrap();
     }
 }
-
-// TODO
-// struct ImageBufferGenOptions {
-//     has_alpha: bool,
-// }
 
 fn byte2size(num: u64) -> String {
     let mut num_f = num as f64;
