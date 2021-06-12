@@ -16,7 +16,7 @@ struct Opt {
     #[structopt(short, long = "ffmpeg", default_value = "x264")]
     ffmpeg_args: String,
     #[structopt(long = "p:crf", default_value = "18")]
-    preset_crf: u8,
+    preset_crf: f32,
 }
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
@@ -94,7 +94,8 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     println!("{:?}", &ffmpeg_cmd);
     let p = std::process::Command::new("ffmpeg")
         .args(ffmpeg_cmd.split(' '))
-        .stdin(std::process::Stdio::null())
+        .stdin(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
         .output()
         .unwrap();
