@@ -58,11 +58,11 @@ pub fn match_ffmpegargs(
 ) -> String {
     let ffmpegargs = match args {
         "x264" => {
-            *container = "mp4";
+            *container = "mkv";
             "-c:v libx264 -pix_fmt yuv444p -preset veryslow -tune animation -deblock -3:-3"
         }
         "x265" => {
-            *container = "mp4";
+            *container = "mkv";
             "-c:v libx265 -pix_fmt yuv444p -preset veryslow -tune animation -x265-params bframes=8:psy-rd=1:aq-mode=3:aq-strength=0.8:deblock=-3,-3"
         }
         "apng" => {
