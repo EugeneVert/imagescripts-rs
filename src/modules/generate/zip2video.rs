@@ -21,6 +21,7 @@ struct Opt {
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_iter(args);
+    let filestem = Path::new(&opt.input).file_stem().unwrap().to_str().unwrap();
     println!("{:?}", &opt);
 
     // extract zip to tempdir
@@ -30,7 +31,6 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let tempdir = tempfile::tempdir()?;
     zip_archive.extract(&tempdir)?;
     // open animation.json from tempdir
-    // let animdata = std::fs::File::open(tempdir.path().join("animations.json"));
     let animdata_path = std::fs::read_dir(&tempdir)?
         .find(|x| {
             ["js", "json"].contains(
@@ -46,6 +46,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         .expect("No 'js' or 'json' file in zip")
         .unwrap()
         .path();
+    let animdata_file = std::fs::File::open(animdata_path)?;
 
     // let animdata_type_1 = "animations.json".to_string();
     // let animdata_type_2 = format!(
@@ -61,9 +62,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     //     _ => return Err("Can't find animation data".into()),
     // };
 
-    let animdata_file = std::fs::File::open(animdata_path)?;
     let json: HashMap<String, serde_json::Value> = serde_json::from_reader(animdata_file)?;
-    // println!("{:?}", &json);
     let json_frames = &json.into_iter().next().unwrap().1["frames"]
         .as_array()
         .unwrap()
@@ -74,11 +73,10 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
             x["delay"].as_i64().unwrap() as f64 / 1000.0,
         )
     });
-    println!("{:?}", json_frames);
 
     let mut container_type = ""; // TODO
     let mut ffmpegargs = utils::match_ffmpegargs(opt.ffmpeg_args.as_str(), &mut container_type);
-    if utils::is_ffmpeg_preset(opt.ffmpeg_args.as_str()){
+    if utils::is_ffmpeg_preset(opt.ffmpeg_args.as_str()) {
         ffmpegargs += format!(" -crf {}", &opt.preset_crf).as_str();
     }
 
@@ -86,15 +84,18 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     demuxer_fill_from_json(&demuxerf_path, json_mux)?;
     let ffmpeg_cmd = format!(
         "-f concat -i {} {} \
-        -vf pad=ceil(iw/2)*2:ceil(ih/2)*2' out.{}",
+        -vf pad=ceil(iw/2)*2:ceil(ih/2)*2' {}.{}",
         &demuxerf_path.to_str().unwrap(),
         &ffmpegargs,
+        &filestem,
         &container_type
     );
 
     println!("{:?}", &ffmpeg_cmd);
     let p = std::process::Command::new("ffmpeg")
         .args(ffmpeg_cmd.split(' '))
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::inherit())
         .output()
         .unwrap();
     println!("{}", std::str::from_utf8(&p.stderr).unwrap());
