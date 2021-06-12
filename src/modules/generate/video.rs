@@ -29,9 +29,9 @@ struct Opt {
     #[structopt(short, long = "ffmpeg", default_value = "x264")]
     ffmpeg_args: String,
     #[structopt(long = "p:crf", default_value = "18")]
-    preset_crf: u8,
+    preset_crf: f32,
     #[structopt(long = "p:r", default_value = "2")]
-    preset_fps: u8,
+    fps: f32,
     /// don't create archive w/ non-resized images if there any
     #[structopt(long)]
     noarchive: bool,
@@ -57,7 +57,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
     let mut container = "";
     let mut ffmpegargs = utils::match_ffmpegargs(&opt.ffmpeg_args, &mut container);
-    ffmpegargs += format!(" -crf {} -r {}", &opt.preset_crf, &opt.preset_fps).as_str();
+    ffmpegargs += format!(" -crf {}", &opt.preset_crf).as_str();
 
     // let demuxerf = std::fs::File::create("./concat_demuxer")?;
     // let mut demuxerf = std::io::BufWriter::new(demuxerf);
@@ -82,7 +82,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     // std::fs::remove_file("./concat_demuxer")?;
 
     let ffmpeg_cmd = format!(
-        "-r 1 -pattern_type glob -i ./*.{ext} {0} \
+        "-r {fps} -pattern_type glob -i ./*.{ext} {0} \
         -vf scale={1}:{2}:force_original_aspect_ratio=decrease\
         ,pad={1}:{2}:(ow-iw)/2:(oh-ih)/2:'{3}' out.{4}",
         ffmpegargs,
@@ -90,12 +90,16 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         dimm.1,
         opt.background,
         container,
-        ext = opt.extension
+        ext = &opt.extension,
+        fps = &opt.fps
     );
 
     println!("{:?}", &ffmpeg_cmd);
     let p = std::process::Command::new("ffmpeg")
         .args(ffmpeg_cmd.split(' '))
+        .stdin(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
         .output()
         .unwrap();
     println!("{}", std::str::from_utf8(&p.stderr).unwrap());
