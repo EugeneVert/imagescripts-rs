@@ -33,6 +33,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => (print_err()),
             };
         }
+        "gen" => {
+            match selector_submodule {
+                "video" => modules::generate::video::main(args4module)?,
+                "zip2video" => modules::generate::zip2video::main(args4module)?,
+                _ => (print_err()),
+            }
+        }
         "cmds" => modules::cmds::main(args4module)?,
         "size" => {}
         _ => (print_err()),
