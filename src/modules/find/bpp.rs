@@ -3,8 +3,7 @@ use std::{error::Error, ffi::OsString, path::Path};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use structopt::StructOpt;
 
-#[path = "../utils.rs"]
-mod utils;
+use crate::modules::utils;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "imagescripts-rs find", about = " ")]
