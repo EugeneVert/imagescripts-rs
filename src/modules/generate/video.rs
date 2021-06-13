@@ -15,7 +15,7 @@ struct Opt {
     #[structopt(required = false, default_value = "./.", display_order = 0)]
     input: String,
     /// input images extension
-    #[structopt(short = "e", default_value = "png")]
+    #[structopt(short = "e")]
     extension: String,
 
     /// video dimmensions
@@ -26,7 +26,7 @@ struct Opt {
     background: String,
 
     /// ffmpeg arguments (or preset name)
-    #[structopt(short, long = "ffmpeg", default_value = "x264")]
+    #[structopt(short, long = "ffmpeg", default_value = "aom-av1")]
     ffmpeg_args: String,
     #[structopt(long = "p:crf", default_value = "18")]
     preset_crf: f32,
@@ -55,9 +55,11 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         .collect();
     let dimm = get_video_dimm_from_images(&images).unwrap();
 
-    let mut container = "";
-    let mut ffmpegargs = utils::match_ffmpegargs(&opt.ffmpeg_args, &mut container);
-    ffmpegargs += format!(" -crf {}", &opt.preset_crf).as_str();
+    let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, None, None);
+    videoopts.args_match();
+    if videoopts.args_ispreset() {
+        videoopts.ffmpeg_args += format!(" -crf {}", &opt.preset_crf).as_str();
+    }
 
     // let demuxerf = std::fs::File::create("./concat_demuxer")?;
     // let mut demuxerf = std::io::BufWriter::new(demuxerf);
@@ -85,11 +87,11 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         "-r {fps} -pattern_type glob -i ./*.{ext} {0} \
         -vf scale={1}:{2}:force_original_aspect_ratio=decrease\
         ,pad={1}:{2}:(ow-iw)/2:(oh-ih)/2:'{3}' out.{4}",
-        ffmpegargs,
-        dimm.0,
-        dimm.1,
-        opt.background,
-        container,
+        &videoopts.ffmpeg_args,
+        &dimm.0,
+        &dimm.1,
+        &opt.background,
+        &videoopts.container.expect("No video container specified"),
         ext = &opt.extension,
         fps = &opt.fps
     );
