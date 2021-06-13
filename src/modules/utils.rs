@@ -47,40 +47,72 @@ pub fn input_get_from_cwd(input: &mut Vec<String>) {
     input.retain(|i| image_formats.iter().any(|&format| i.ends_with(format)));
 }
 
-pub fn is_ffmpeg_preset(arg: &str) -> bool {
-    let presets = ["x264", "x265", "apng"];
-    presets.contains(&arg)
+#[derive(Clone)]
+pub struct VideoOpts {
+    args: String,
+    pub container: Option<String>,
+    pub ffmpeg_args: String,
+    two_pass: Option<bool>,
 }
 
-pub fn match_ffmpegargs(
-    args: &str,
-    container: &mut &str,
-) -> String {
-    let ffmpegargs = match args {
-        "x264" => {
-            *container = "mkv";
-            "-c:v libx264 -pix_fmt yuv444p -preset veryslow -tune animation -deblock -3:-3"
+impl VideoOpts {
+    pub fn new(args: &str, container: Option<&str>, two_pass: Option<bool>) -> VideoOpts {
+        VideoOpts {
+            args: String::from(args),
+            container: { container.map(|s| s.to_string()) },
+            ffmpeg_args: String::new(),
+            two_pass,
         }
-        "x265" => {
-            *container = "mkv";
-            "-c:v libx265 -pix_fmt yuv444p -preset veryslow -tune animation -x265-params bframes=8:psy-rd=1:aq-mode=3:aq-strength=0.8:deblock=-3,-3"
+    }
+
+    /// Returns preset args for ffmpeg if 'args' is preset name. Else returns 'args'
+    /// If container is "", assigns preset_container to container
+    pub fn args_match(&mut self) {
+        let preset_container: &str;
+        let preset_two_pass: bool;
+        let ffmpegargs = match self.args.as_str() {
+            "x264" => {
+                preset_container = "mkv";
+                preset_two_pass = true;
+                "-c:v libx264 -pix_fmt yuv444p -preset veryslow -tune animation -deblock -3:-3"
+            }
+            "x265" => {
+                preset_container = "mkv";
+                preset_two_pass = true;
+                "-c:v libx265 -pix_fmt yuv444p -preset veryslow -tune animation -x265-params bframes=8:psy-rd=1:aq-mode=3:aq-strength=0.8:deblock=-3,-3"
+            }
+            "apng" => {
+                preset_container = "apng";
+                preset_two_pass = false;
+                "-c:v apng"
+            }
+            "vp9" => {
+                preset_container = "webm";
+                preset_two_pass = true;
+                "-c:v libvpx-vp9 -pix_fmt yuv444p -b:v 0"
+            }
+            "aom-av1" => {
+                preset_container = "mkv";
+                preset_two_pass = true;
+                "-c:v libaom-av1 -pix_fmt yuv444p10le -b:v 0 -cpu-used 4 -tile-rows 2 -strict -2 -aom-params enable-chroma-deltaq=1"
+            }
+            _ => {
+                preset_container = "mkv";
+                preset_two_pass = false;
+                &self.args
+            }
+        };
+        if self.container.is_none() {
+            self.container = Some(preset_container.into());
         }
-        "apng" => {
-            *container = "apng";
-            "-c:v apng"
+        if self.two_pass.is_none() {
+            self.two_pass = Some(preset_two_pass);
         }
-        // "vp9" => {
-        //     container = "webm";
-        //     format!("")
-        // }
-        // "libaom-av1" => {
-        //     container = "mkv";
-        //     format!("")
-        // }
-        _ => {
-            *container = "mkv";
-            args
-        }
-    };
-    ffmpegargs.to_string()
+        self.ffmpeg_args = ffmpegargs.into();
+    }
+
+    pub fn args_ispreset(&self) -> bool {
+        let presets = ["x264", "x265", "apng", "vp9", "aom-av1"];
+        presets.contains(&self.args.as_str())
+    }
 }

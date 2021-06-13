@@ -13,7 +13,7 @@ struct Opt {
     input: String,
 
     /// ffmpeg arguments (or preset name)
-    #[structopt(short, long = "ffmpeg", default_value = "x264")]
+    #[structopt(short, long = "ffmpeg", default_value = "aom-av1")]
     ffmpeg_args: String,
     #[structopt(long = "p:crf", default_value = "18")]
     preset_crf: f32,
@@ -74,10 +74,10 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         )
     });
 
-    let mut container_type = ""; // TODO
-    let mut ffmpegargs = utils::match_ffmpegargs(opt.ffmpeg_args.as_str(), &mut container_type);
-    if utils::is_ffmpeg_preset(opt.ffmpeg_args.as_str()) {
-        ffmpegargs += format!(" -crf {}", &opt.preset_crf).as_str();
+    let mut videopts = utils::VideoOpts::new(&opt.ffmpeg_args, None, None);
+    videopts.args_match();
+    if videopts.args_ispreset() {
+        videopts.ffmpeg_args += format!(" -crf {}", &opt.preset_crf).as_str();
     }
 
     let demuxerf_path = tempdir.path().join("concat_demuxer");
@@ -86,9 +86,9 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         "-f concat -i {} {} \
         -vf pad=ceil(iw/2)*2:ceil(ih/2)*2' {}.{}",
         &demuxerf_path.to_str().unwrap(),
-        &ffmpegargs,
+        &videopts.ffmpeg_args,
         &filestem,
-        &container_type
+        &videopts.container.expect("No video container specified")
     );
 
     println!("{:?}", &ffmpeg_cmd);
