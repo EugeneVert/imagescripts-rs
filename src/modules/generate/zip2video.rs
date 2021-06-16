@@ -17,6 +17,10 @@ struct Opt {
     ffmpeg_args: String,
     #[structopt(long = "p:crf", default_value = "18")]
     preset_crf: f32,
+    #[structopt(short, long = "container")]
+    container: Option<String>,
+    #[structopt(long)]
+    two_pass: Option<bool>,
 }
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
@@ -74,32 +78,24 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         )
     });
 
-    let mut videopts = utils::VideoOpts::new(&opt.ffmpeg_args, None, None);
-    videopts.args_match();
-    if videopts.args_ispreset() {
-        videopts.ffmpeg_args += format!(" -crf {}", &opt.preset_crf).as_str();
+    let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, opt.container, opt.two_pass);
+    videoopts.args_match();
+    if videoopts.args_ispreset() {
+        videoopts.ffmpeg_args += format!(" -crf {}", &opt.preset_crf).as_str();
     }
 
     let demuxerf_path = tempdir.path().join("concat_demuxer");
     demuxer_fill_from_json(&demuxerf_path, json_mux)?;
     let ffmpeg_cmd = format!(
         "-f concat -i {} {} \
-        -vf pad=ceil(iw/2)*2:ceil(ih/2)*2' {}.{}",
+        -vf pad=ceil(iw/2)*2:ceil(ih/2)*2' ",
         &demuxerf_path.to_str().unwrap(),
-        &videopts.ffmpeg_args,
-        &filestem,
-        &videopts.container.expect("No video container specified")
+        &videoopts.ffmpeg_args,
     );
 
-    println!("{:?}", &ffmpeg_cmd);
-    let p = std::process::Command::new("ffmpeg")
-        .args(ffmpeg_cmd.split(' '))
-        .stdin(std::process::Stdio::inherit())
-        .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::inherit())
-        .output()
-        .unwrap();
-    println!("{}", std::str::from_utf8(&p.stderr).unwrap());
+    let container = videoopts.container.expect("No video container specified");
+    let two_pass = videoopts.two_pass.unwrap();
+    utils::ffmpeg_run(&ffmpeg_cmd, &filestem, two_pass, &container);
 
     Ok(())
 }

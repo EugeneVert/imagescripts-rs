@@ -18,9 +18,9 @@ struct Opt {
     #[structopt(short = "e")]
     extension: String,
 
-    /// video dimmensions
+    /// video dimensions
     #[structopt(short = "d")]
-    dimmensions: Option<String>,
+    dimensions: Option<String>,
     /// video background for resized images
     #[structopt(long = "bg", default_value = "Black")]
     background: String,
@@ -30,11 +30,15 @@ struct Opt {
     ffmpeg_args: String,
     #[structopt(long = "p:crf", default_value = "18")]
     preset_crf: f32,
-    #[structopt(long = "p:r", default_value = "2")]
+    #[structopt(short, long = "container")]
+    container: Option<String>,
+    #[structopt(short = "r", default_value = "2")]
     fps: f32,
-    /// don't create archive w/ non-resized images if there any
     #[structopt(long)]
-    noarchive: bool,
+    two_pass: Option<bool>,
+    // /// don't create archive w/ non-resized images if there any
+    // #[structopt(long)]
+    // noarchive: bool,
 }
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
@@ -42,7 +46,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     println!("{:?}", &opt);
 
     std::env::set_current_dir(&opt.input)?;
-    println!("Chdir to: {:?}", std::env::current_dir());
+    println!("Chdir to: {:?}", std::env::current_dir().unwrap());
 
     let images: Result<Vec<DirEntry>, _> = std::fs::read_dir("./.")?.collect();
     let images: Vec<DirEntry> = images?
@@ -55,60 +59,32 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         .collect();
     let dimm = get_video_dimm_from_images(&images).unwrap();
 
-    let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, None, None);
+    let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, opt.container, opt.two_pass);
     videoopts.args_match();
     if videoopts.args_ispreset() {
         videoopts.ffmpeg_args += format!(" -crf {}", &opt.preset_crf).as_str();
     }
 
-    // let demuxerf = std::fs::File::create("./concat_demuxer")?;
-    // let mut demuxerf = std::io::BufWriter::new(demuxerf);
-    // images.sort_unstable_by_key(|x| x.path().as_os_str().to_os_string());
-    // demuxerf.write_all(b"ffconcat version 1.0\n")?;
-    // for i in images {
-    //     demuxerf.write_all(
-    //         format!(
-    //             "file \'{}\'\nduration 1\n",
-    //             &i.path().file_name().unwrap().to_str().unwrap(),
-    //         )
-    //         .as_bytes(),
-    //     )?
-    // }
-    // demuxerf.flush()?;
-    // let ffmpeg_cmd = format!(
-    //     "-f concat -i ./concat_demuxer {0} \
-    //     -vf scale={1}:{2}:force_original_aspect_ratio=decrease\
-    //     ,pad={1}:{2}:(ow-iw)/2:(oh-ih)/2:'{3}' out.{4}",
-    //     ffmpegargs, dimm.0, dimm.1, opt.background, container
-    // );
-    // std::fs::remove_file("./concat_demuxer")?;
-
     let ffmpeg_cmd = format!(
         "-r {fps} -pattern_type glob -i ./*.{ext} {0} \
         -vf scale={1}:{2}:force_original_aspect_ratio=decrease\
-        ,pad={1}:{2}:(ow-iw)/2:(oh-ih)/2:'{3}' out.{4}",
+        ,pad={1}:{2}:(ow-iw)/2:(oh-ih)/2:'{background}' ",
         &videoopts.ffmpeg_args,
         &dimm.0,
         &dimm.1,
-        &opt.background,
-        &videoopts.container.expect("No video container specified"),
         ext = &opt.extension,
-        fps = &opt.fps
+        fps = &opt.fps,
+        background = &opt.background,
     );
 
-    println!("{:?}", &ffmpeg_cmd);
-    let p = std::process::Command::new("ffmpeg")
-        .args(ffmpeg_cmd.split(' '))
-        .stdin(std::process::Stdio::inherit())
-        .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::inherit())
-        .output()
-        .unwrap();
-    println!("{}", std::str::from_utf8(&p.stderr).unwrap());
+    let container = videoopts.container.expect("No video container specified");
+    let two_pass = videoopts.two_pass.unwrap();
+    utils::ffmpeg_run(&ffmpeg_cmd, "out", two_pass, &container);
 
     Ok(())
 }
 
+/// Get most frequent width & hight from images (DirEntry) array
 fn get_video_dimm_from_images(images: &[DirEntry]) -> Option<(u32, u32)> {
     let mut images_w = Vec::<u32>::new();
     let mut images_h = Vec::<u32>::new();
@@ -124,7 +100,7 @@ fn get_video_dimm_from_images(images: &[DirEntry]) -> Option<(u32, u32)> {
     println!("{:?}", (freq_w, freq_h));
     match (freq_w, freq_h) {
         (Some(w), Some(h)) => Some((w, h)),
-        _ => None,
+       _ => None,
     }
 }
 
