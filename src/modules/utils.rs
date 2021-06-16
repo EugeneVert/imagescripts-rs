@@ -52,14 +52,14 @@ pub struct VideoOpts {
     args: String,
     pub container: Option<String>,
     pub ffmpeg_args: String,
-    two_pass: Option<bool>,
+    pub two_pass: Option<bool>,
 }
 
 impl VideoOpts {
-    pub fn new(args: &str, container: Option<&str>, two_pass: Option<bool>) -> VideoOpts {
+    pub fn new(args: &str, container: Option<String>, two_pass: Option<bool>) -> VideoOpts {
         VideoOpts {
             args: String::from(args),
-            container: { container.map(|s| s.to_string()) },
+            container,
             ffmpeg_args: String::new(),
             two_pass,
         }
@@ -115,4 +115,28 @@ impl VideoOpts {
         let presets = ["x264", "x265", "apng", "vp9", "aom-av1"];
         presets.contains(&self.args.as_str())
     }
+}
+
+pub fn ffmpeg_run(ffmpeg_cmd: &str, filestem: &str, two_pass: bool, container: &str) {
+    if two_pass {
+        let ffmpeg_cmd_pass1 = ffmpeg_cmd.to_owned() + "-pass 1 -an -f null /dev/null";
+        let ffmpeg_cmd_pass2 =
+            ffmpeg_cmd.to_owned() + "-pass 2 -hide_banner " + filestem + "." + container;
+        ffmpeg_cmd_run(&ffmpeg_cmd_pass1);
+        ffmpeg_cmd_run(&ffmpeg_cmd_pass2);
+    } else {
+        let ffmpeg_cmd_once = ffmpeg_cmd.to_owned() + filestem + "." + container;
+        ffmpeg_cmd_run(&ffmpeg_cmd_once);
+    }
+}
+
+fn ffmpeg_cmd_run(ffmpeg_cmd: &str) {
+    println!("{:?}", ffmpeg_cmd);
+    std::process::Command::new("ffmpeg")
+        .args(ffmpeg_cmd.split(' '))
+        .stdin(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .unwrap();
 }
