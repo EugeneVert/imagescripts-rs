@@ -1,9 +1,12 @@
-
-use std::ffi::OsString;
 use imagescripts_rs::modules;
+use std::ffi::OsString;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<OsString> = std::env::args_os().collect();
+    if args.len() < 2 {
+        print_modules();
+        return Ok(());
+    }
 
     let selector_module = args[1].to_str().unwrap();
     let selector_submodule = match args.get(2) {
@@ -20,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let args4module = args[args_ind..args.len()].to_vec();
-    println!("{:?}", args4module);
+    // println!("{:?}", args4module);
 
     match selector_module {
         "find" => {
@@ -28,25 +31,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "bpp" => modules::find::bpp::main(args4module)?,
                 "grayscale" => modules::find::grayscale::main(args4module)?,
                 "resizeble" => modules::find::resizable::main(args4module)?,
-                "samesize" => {}
-                "simmilar" => {}
-                _ => (print_err()),
+                // "samesize" => {}
+                // "simmilar" => {}
+                _ => (print_err(&selector_submodule)),
             };
         }
-        "gen" => {
-            match selector_submodule {
-                "video" => modules::generate::video::main(args4module)?,
-                "zip2video" => modules::generate::zip2video::main(args4module)?,
-                _ => (print_err()),
-            }
-        }
+        "gen" => match selector_submodule {
+            "video" => modules::generate::video::main(args4module)?,
+            "zip2video" => modules::generate::zip2video::main(args4module)?,
+            _ => (print_err(&selector_submodule)),
+        },
         "cmds" => modules::cmds::main(args4module)?,
-        "size" => {}
-        _ => (print_err()),
+        // "size" => {}
+        _ => (print_err(&selector_submodule)),
     };
     Ok(())
 }
 
-fn print_err() {
-    println!("No such option")
+fn print_modules() {
+    println!(
+        "\
+Avaible options:
+    cmds
+    find ---\\
+        bpp
+        grayscale
+        resizeble
+    gen  ---\\
+        video
+        zip2video"
+    );
+}
+
+fn print_err(x: &str) {
+    println!("{}", "No such option: ".to_string() + x);
+    print_modules();
 }
