@@ -14,8 +14,9 @@ struct Opt {
     lesser: Option<f32>,
     #[structopt(short, conflicts_with = "lesser")]
     bigger: Option<f32>,
-    #[structopt(short = "mv")]
-    mv: bool,
+    /// Custom metric: bpp + px_count / 2048^2
+    #[structopt(short = "m")]
+    custom_metric: bool,
     #[structopt(long, default_value = "0")]
     nproc: usize,
 }
@@ -25,7 +26,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     //     args = std::env::args_os().collect();
     // }
     let opt = Opt::from_iter(args);
-    let out_dir = std::path::PathBuf::from(unwrap_two(opt.lesser, opt.lesser).to_string());
+    let out_dir = std::path::PathBuf::from(unwrap_two(opt.lesser, opt.bigger).to_string());
     let mut images = opt.input.to_owned();
     utils::ims_init(&mut images, &out_dir, Some(opt.nproc));
 
@@ -49,18 +50,25 @@ fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), 
     let img_dimensions = image::image_dimensions(&img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
     let img_bpp = (img_filesize * 8) as f32 / px_count as f32;
+    let img_metric;
+    if opt.custom_metric {
+        let img_metric_custom = img_bpp + px_count as f32 / 4194304_f32;
+        img_metric = img_metric_custom;
+    } else {
+        img_metric = img_bpp;
+    }
 
-    println!("File: {}\n bpp: {:.3}", img, img_bpp);
+    println!("File: {}\n bpp: {:.3}", img, img_metric);
     let mut save_flag: bool = false;
     match opt.lesser {
         Some(val) => {
-            if img_bpp < val {
+            if img_metric < val {
                 save_flag = true;
             }
         }
         None => {
             let val = opt.bigger.unwrap();
-            if img_bpp > val {
+            if img_metric > val {
                 save_flag = true;
             }
         }
