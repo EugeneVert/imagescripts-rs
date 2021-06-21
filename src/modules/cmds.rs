@@ -209,8 +209,10 @@ impl ImageBuffer {
         let time_start = std::time::Instant::now();
         match cmd_cmd {
             "image" => {}
-            "cjxl" => self.gen_from_cmd(img_path, "cjxl", "jxl"),
-            "avif" => self.gen_from_cmd(img_path, "avifenc", "avif"),
+            "jpeg" => self.gen_from_cmd(img_path, "cmozjpeg", "jpg", true),
+            "cjxl" => self.gen_from_cmd(img_path, "cjxl", "jxl", false),
+            "avif" => self.gen_from_cmd(img_path, "avifenc", "avif", false),
+            "cwebp" => self.gen_from_cmd(img_path, "cwebp", "webp", false),
             _ => {
                 panic!("match error, cmd '{}' not supported", &cmd_cmd)
             }
@@ -218,29 +220,37 @@ impl ImageBuffer {
         self.ex_time = time_start.elapsed();
     }
 
-    fn gen_from_cmd(&mut self, img_path: &str, cmd: &str, ext: &str) {
-        let buffer = tempfile::Builder::new()
-            .suffix(&format!(".{}", ext))
-            .tempfile()
-            .unwrap();
+    fn gen_from_cmd(&mut self, img_path: &str, cmd: &str, ext: &str, img_from_stdout: bool) {
         let mut cmd_args: Vec<&str> = self.cmd.split_once(":").unwrap().1.split(' ').collect();
-
         // no arguments -> return None
         if cmd_args.contains(&"") {
             cmd_args.pop();
         }
 
-        std::process::Command::new(cmd)
-            .arg(img_path)
-            .args(cmd_args)
-            .arg(buffer.path())
-            .output()
-            .unwrap();
-        // println!("{}", std::str::from_utf8(&output.stderr).unwrap());
-
-        self.image = std::fs::read(buffer.path()).unwrap();
+        if img_from_stdout {
+            let output = std::process::Command::new(cmd)
+                .args(cmd_args)
+                .arg(img_path)
+                .output()
+                .unwrap();
+            self.image = output.stdout;
+        } else {
+            let buffer = tempfile::Builder::new()
+                .suffix(&format!(".{}", ext))
+                .tempfile()
+                .unwrap();
+            std::process::Command::new(cmd)
+                .args(cmd_args)
+                .arg(img_path)
+                .arg(buffer.path())
+                .output()
+                .unwrap();
+            self.image = std::fs::read(buffer.path()).unwrap();
+            buffer.close().unwrap();
+        }
         self.set_ext(ext);
-        buffer.close().unwrap();
+
+        // println!("{}", std::str::from_utf8(&output.stderr).unwrap());
     }
 }
 
