@@ -28,7 +28,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     images
         .iter()
         .par_bridge()
-        .for_each(|img| process_image(&img, opt.out_dir.as_path(), &opt).unwrap());
+        .for_each(|img| process_image(&img, opt.out_dir.as_path(), &opt).expect(&(img.to_string() + "  Error processing image")));
 
     Ok(())
 }
