@@ -3,6 +3,7 @@ use std::path::Path;
 pub fn ims_init(input: &mut Vec<String>, output_dir: &std::path::Path, nproc: Option<usize>) {
     if input.get(0).unwrap() == "./*" {
         input_get_from_cwd(input);
+        input_filter_images(input);
     }
     mkdir(output_dir);
     if let Some(n) = nproc {
@@ -35,7 +36,6 @@ pub fn mkdir(dir: &std::path::Path) {
 /// }
 /// ```
 pub fn input_get_from_cwd(input: &mut Vec<String>) {
-    let image_formats = ["png", "jpg", "webp"];
     input.append(
         &mut std::path::Path::new(".")
             .read_dir()
@@ -44,6 +44,10 @@ pub fn input_get_from_cwd(input: &mut Vec<String>) {
             .collect::<Vec<String>>(),
     );
     input.remove(0);
+}
+
+pub fn input_filter_images(input: &mut Vec<String>) {
+    let image_formats = ["png", "jpg", "webp"];
     input.retain(|i| image_formats.iter().any(|&format| i.ends_with(format)));
 }
 
