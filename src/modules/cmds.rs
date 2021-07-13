@@ -174,8 +174,9 @@ fn process_image(
                     + "ssimulacra: "
                     + ssimulacra
             }
-            println!("{}", printing_status);
         }
+        
+        println!("{}", printing_status);
 
         if save_csv {
             csv_row.push(buff_filesize.to_string());
@@ -250,7 +251,7 @@ impl ImageMetricsOptions {
         if is_program_in_path("butteraugli_main") {
             self.butteraugli = true;
         }
-        if is_program_in_path("ssimulacra") {
+        if is_program_in_path("ssimulacra_main") {
             self.ssimulacra = true;
         }
         self.list_avaible().len().ne(&0)
@@ -284,7 +285,7 @@ impl ImageMetricsOptions {
             .collect())
     }
     fn ssimulacra_run(&self, original: &str, distorted: &str) -> Result<String, Box<dyn Error>> {
-        let outp = std::process::Command::new("ssimulacra")
+        let outp = std::process::Command::new("ssimulacra_main")
             .arg(original)
             .arg(distorted)
             .output()?;
