@@ -157,14 +157,16 @@ pub fn ffmpeg_demuxer_create_from_json<T>(
     json_mux: T,
 ) -> Result<(), Box<dyn Error>>
 where
-    T: Iterator<Item = (String, f64)>,
+    T: Iterator<Item = (String, f64)> + Clone,
 {
     let demuxerf = std::fs::File::create(demuxerf_path)?;
     let mut demuxerf = std::io::BufWriter::new(demuxerf);
     demuxerf.write_all(b"ffconcat version 1.0\n")?;
-    for i in json_mux {
+    for i in json_mux.clone() {
         demuxerf.write_all(format!("file \'{}\'\nduration {}\n", i.0, i.1,).as_bytes())?;
     }
+    let json_mux_last_f = &json_mux.last().unwrap().0;
+    demuxerf.write_all(("file ".to_string() + &json_mux_last_f + "\n").as_bytes())?;
     demuxerf.flush()?;
     Ok(())
 }
@@ -177,8 +179,9 @@ pub fn ffmpeg_demuxer_create_from_files(
     let mut demuxerf = std::io::BufWriter::new(demuxerf);
     demuxerf.write_all(b"ffconcat version 1.0\n")?;
     for i in input {
-        demuxerf.write_all(format!("file {}\nduration {}\n", i, 2,).as_bytes())?;
+        demuxerf.write_all(("file ".to_string() + i + "\n").as_bytes())?;
     }
+    demuxerf.write_all(("file ".to_string() + &input.last().unwrap() + "\n").as_bytes())?;
     demuxerf.flush()?;
     Ok(())
 }

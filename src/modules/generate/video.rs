@@ -47,6 +47,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         utils::input_get_from_cwd(&mut images);
         utils::input_filter_images(&mut images);
     }
+
     let dimm = get_video_dimm_from_images(&images).unwrap();
 
     let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, opt.container, opt.two_pass);
@@ -54,6 +55,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     if videoopts.args_ispreset() {
         videoopts.ffmpeg_args += format!(" -crf {}", &opt.preset_crf).as_str();
     }
+
     let demuxerf_path = Path::new("./concat_demuxer");
     utils::ffmpeg_demuxer_create_from_files(demuxerf_path, &images)?;
 
@@ -71,7 +73,11 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
     let container = videoopts.container.expect("No video container specified");
     let two_pass = videoopts.two_pass.unwrap();
-    utils::ffmpeg_run(&ffmpeg_cmd, "out", two_pass, &container);
+    let output_filestem = Path::new(&images[0])
+        .file_stem()
+        .and_then(|x| x.to_str())
+        .unwrap();
+    utils::ffmpeg_run(&ffmpeg_cmd, &output_filestem, two_pass, &container);
 
     Ok(())
 }
