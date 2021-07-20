@@ -1,7 +1,8 @@
 use std::cmp::Eq;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::{error::Error, ffi::OsString, fs::DirEntry};
+use std::path::Path;
+use std::{error::Error, ffi::OsString};
 
 use clap::AppSettings;
 use structopt::StructOpt;
@@ -11,12 +12,9 @@ use crate::modules::utils;
 #[derive(StructOpt, Debug)]
 #[structopt(setting = AppSettings::ColoredHelp)]
 struct Opt {
-    /// input directory
-    #[structopt(required = false, default_value = "./.", display_order = 0)]
-    input: String,
-    /// input images extension
-    #[structopt(short = "e")]
-    extension: String,
+    /// input files
+    #[structopt(required = false, default_value = "./*", display_order = 0)]
+    input: Vec<String>,
 
     /// video dimensions
     #[structopt(short = "d")]
@@ -25,10 +23,10 @@ struct Opt {
     #[structopt(long = "bg", default_value = "Black")]
     background: String,
 
-    /// ffmpeg arguments (or preset name)
+    /// ffmpeg arguments (or preset name ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"])
     #[structopt(short, long = "ffmpeg", default_value = "aom-av1")]
     ffmpeg_args: String,
-    #[structopt(long = "p:crf", default_value = "18")]
+    #[structopt(long = "p:crf", default_value = "17")]
     preset_crf: f32,
     #[structopt(short, long = "container")]
     container: Option<String>,
@@ -43,20 +41,12 @@ struct Opt {
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_iter(args);
-    println!("{:?}", &opt);
 
-    std::env::set_current_dir(&opt.input)?;
-    println!("Chdir to: {:?}", std::env::current_dir().unwrap());
-
-    let images: Result<Vec<DirEntry>, _> = std::fs::read_dir("./.")?.collect();
-    let images: Vec<DirEntry> = images?
-        .into_iter()
-        .filter(|x| -> bool {
-            let x_path = x.path();
-            let x_ext = x_path.extension();
-            x_path.is_file() && x_ext.is_some() && x_ext.unwrap().to_str().unwrap() == opt.extension
-        })
-        .collect();
+    let mut images = opt.input.to_owned();
+    if images.get(0).unwrap() == "./*" {
+        utils::input_get_from_cwd(&mut images);
+        utils::input_filter_images(&mut images);
+    }
     let dimm = get_video_dimm_from_images(&images).unwrap();
 
     let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, opt.container, opt.two_pass);
@@ -64,15 +54,17 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     if videoopts.args_ispreset() {
         videoopts.ffmpeg_args += format!(" -crf {}", &opt.preset_crf).as_str();
     }
+    let demuxerf_path = Path::new("./concat_demuxer");
+    utils::ffmpeg_demuxer_create_from_files(demuxerf_path, &images)?;
 
     let ffmpeg_cmd = format!(
-        "-r {fps} -pattern_type glob -i ./*.{ext} {0} \
+        "-r {fps} -safe 0 -f concat -i {demuxer_path} {0} \
         -vf scale={1}:{2}:force_original_aspect_ratio=decrease\
         ,pad={1}:{2}:(ow-iw)/2:(oh-ih)/2:'{background}' ",
         &videoopts.ffmpeg_args,
         &dimm.0,
         &dimm.1,
-        ext = &opt.extension,
+        demuxer_path = &demuxerf_path.to_str().unwrap(),
         fps = &opt.fps,
         background = &opt.background,
     );
@@ -85,12 +77,12 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 }
 
 /// Get most frequent width & hight from images (DirEntry) array
-fn get_video_dimm_from_images(images: &[DirEntry]) -> Option<(u32, u32)> {
+fn get_video_dimm_from_images(images: &[String]) -> Option<(u32, u32)> {
     let mut images_w = Vec::<u32>::new();
     let mut images_h = Vec::<u32>::new();
     images
         .iter()
-        .map(|i| image::image_dimensions(&i.path()).unwrap())
+        .map(|i| image::image_dimensions(Path::new(i)).unwrap())
         .for_each(|d| {
             images_w.push(d.0);
             images_h.push(d.1);
@@ -100,7 +92,7 @@ fn get_video_dimm_from_images(images: &[DirEntry]) -> Option<(u32, u32)> {
     println!("{:?}", (freq_w, freq_h));
     match (freq_w, freq_h) {
         (Some(w), Some(h)) => Some((w, h)),
-       _ => None,
+        _ => None,
     }
 }
 

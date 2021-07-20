@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{error::Error, io::Write, path::Path};
 
 pub fn ims_init(input: &mut Vec<String>, output_dir: &std::path::Path, nproc: Option<usize>) {
     if input.get(0).unwrap() == "./*" {
@@ -77,13 +77,13 @@ impl VideoOpts {
         let ffmpegargs = match self.args.as_str() {
             "x264" => {
                 preset_container = "mkv";
-                preset_two_pass = true;
-                "-c:v libx264 -pix_fmt yuv444p -preset veryslow -tune animation -deblock -3:-3"
+                preset_two_pass = false;
+                "-c:v libx264 -preset veryslow -tune animation -deblock -1:-1"
             }
             "x265" => {
                 preset_container = "mkv";
                 preset_two_pass = true;
-                "-c:v libx265 -pix_fmt yuv444p -preset veryslow -tune animation -x265-params bframes=8:psy-rd=1:aq-mode=3:aq-strength=0.8:deblock=-3,-3"
+                "-c:v libx265 -preset veryslow -tune animation -x265-params bframes=8:psy-rd=1:aq-mode=3:aq-strength=0.8:deblock=-3,-3"
             }
             "apng" => {
                 preset_container = "apng";
@@ -100,6 +100,11 @@ impl VideoOpts {
                 preset_two_pass = true;
                 "-c:v libaom-av1 -pix_fmt yuv444p10le -b:v 0 -cpu-used 4 -tile-rows 2 -strict -2 -aom-params enable-chroma-deltaq=1"
             }
+            "aom-av1-simple" => {
+                preset_container = "mkv";
+                preset_two_pass = true;
+                "-c:v libaom-av1 -pix_fmt yuv444p10le -b:v 0 -cpu-used 4 -tile-rows 2 -strict -2"
+            }
             _ => {
                 preset_container = "mkv";
                 preset_two_pass = false;
@@ -114,9 +119,11 @@ impl VideoOpts {
         }
         self.ffmpeg_args = ffmpegargs.into();
     }
-
+    pub fn presets_list() -> Vec<&'static str> {
+        vec!["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"]
+    }
     pub fn args_ispreset(&self) -> bool {
-        let presets = ["x264", "x265", "apng", "vp9", "aom-av1"];
+        let presets = Self::presets_list();
         presets.contains(&self.args.as_str())
     }
 }
@@ -143,4 +150,35 @@ fn ffmpeg_cmd_run(ffmpeg_cmd: &str) {
         .stderr(std::process::Stdio::inherit())
         .output()
         .unwrap();
+}
+
+pub fn ffmpeg_demuxer_create_from_json<T>(
+    demuxerf_path: &Path,
+    json_mux: T,
+) -> Result<(), Box<dyn Error>>
+where
+    T: Iterator<Item = (String, f64)>,
+{
+    let demuxerf = std::fs::File::create(demuxerf_path)?;
+    let mut demuxerf = std::io::BufWriter::new(demuxerf);
+    demuxerf.write_all(b"ffconcat version 1.0\n")?;
+    for i in json_mux {
+        demuxerf.write_all(format!("file \'{}\'\nduration {}\n", i.0, i.1,).as_bytes())?;
+    }
+    demuxerf.flush()?;
+    Ok(())
+}
+
+pub fn ffmpeg_demuxer_create_from_files(
+    demuxerf_path: &Path,
+    input: &[String],
+) -> Result<(), Box<dyn Error>> {
+    let demuxerf = std::fs::File::create(demuxerf_path)?;
+    let mut demuxerf = std::io::BufWriter::new(demuxerf);
+    demuxerf.write_all(b"ffconcat version 1.0\n")?;
+    for i in input {
+        demuxerf.write_all(format!("file {}\nduration {}\n", i, 2,).as_bytes())?;
+    }
+    demuxerf.flush()?;
+    Ok(())
 }
