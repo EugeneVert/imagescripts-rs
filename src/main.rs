@@ -37,6 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
         }
         "gen" => match selector_submodule {
+            "ffmpeg_concat" => modules::generate::ffmpeg_concat::main(args4module)?,
             "video" => modules::generate::video::main(args4module)?,
             "zip2video" => modules::generate::zip2video::main(args4module)?,
             _ => (print_err(&selector_submodule)),
@@ -58,6 +59,7 @@ Avaible options:
         grayscale
         resizeble
     gen  ---\\
+        ffmpeg_concat
         video
         zip2video"
     );

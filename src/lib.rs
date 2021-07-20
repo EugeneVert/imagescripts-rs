@@ -6,6 +6,7 @@ pub mod modules {
         pub mod resizable;
     }
     pub mod generate {
+        pub mod ffmpeg_concat;
         pub mod video;
         pub mod zip2video;
     }

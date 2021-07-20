@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, ffi::OsString, io::Write, path::Path};
+use std::{collections::HashMap, error::Error, ffi::OsString, path::Path};
 
 use clap::AppSettings;
 use structopt::StructOpt;
@@ -85,7 +85,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     }
 
     let demuxerf_path = tempdir.path().join("concat_demuxer");
-    demuxer_fill_from_json(&demuxerf_path, json_mux)?;
+    utils::ffmpeg_demuxer_create_from_json(&demuxerf_path, json_mux)?;
     let ffmpeg_cmd = format!(
         "-f concat -i {} {} \
         -vf pad=ceil(iw/2)*2:ceil(ih/2)*2' ",
@@ -97,19 +97,5 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let two_pass = videoopts.two_pass.unwrap();
     utils::ffmpeg_run(&ffmpeg_cmd, &filestem, two_pass, &container);
 
-    Ok(())
-}
-
-fn demuxer_fill_from_json<T>(demuxerf_path: &Path, json_mux: T) -> Result<(), Box<dyn Error>>
-where
-    T: Iterator<Item = (String, f64)>,
-{
-    let demuxerf = std::fs::File::create(demuxerf_path)?;
-    let mut demuxerf = std::io::BufWriter::new(demuxerf);
-    demuxerf.write_all(b"ffconcat version 1.0\n")?;
-    for i in json_mux {
-        demuxerf.write_all(format!("file \'{}\'\nduration {}\n", i.0, i.1,).as_bytes())?
-    }
-    demuxerf.flush()?;
     Ok(())
 }
