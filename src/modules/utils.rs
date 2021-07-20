@@ -78,12 +78,12 @@ impl VideoOpts {
             "x264" => {
                 preset_container = "mkv";
                 preset_two_pass = false;
-                "-c:v libx264 -preset veryslow -tune animation -deblock -1:-1"
+                "-c:v libx264 -pix_fmt yuv444p -preset veryslow -tune animation -deblock -1:-1"
             }
             "x265" => {
                 preset_container = "mkv";
                 preset_two_pass = true;
-                "-c:v libx265 -preset veryslow -tune animation -x265-params bframes=8:psy-rd=1:aq-mode=3:aq-strength=0.8:deblock=-3,-3"
+                "-c:v libx265 -pix_fmt yuv444p -preset veryslow -tune animation -x265-params bframes=8:psy-rd=1:aq-mode=3:aq-strength=0.8:deblock=-3,-3"
             }
             "apng" => {
                 preset_container = "apng";
