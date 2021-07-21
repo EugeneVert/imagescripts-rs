@@ -71,12 +71,12 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         .as_array()
         .unwrap()
         .clone();
-    let json_mux = json_frames.iter().map(|x| {
+    let json_mux: Vec<(String, f64)> = json_frames.iter().map(|x| {
         (
             x["file"].as_str().unwrap().to_string(),
             x["delay"].as_i64().unwrap() as f64 / 1000.0,
         )
-    });
+    }).collect();
 
     let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, opt.container, opt.two_pass);
     videoopts.args_match();
@@ -85,7 +85,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     }
 
     let demuxerf_path = tempdir.path().join("concat_demuxer");
-    utils::ffmpeg_demuxer_create_from_json(&demuxerf_path, json_mux)?;
+    utils::ffmpeg_demuxer_create_from_json(&demuxerf_path, &json_mux)?;
     let ffmpeg_cmd = format!(
         "-f concat -i {} {} \
         -vf pad=ceil(iw/2)*2:ceil(ih/2)*2' ",

@@ -154,19 +154,16 @@ fn ffmpeg_cmd_run(ffmpeg_cmd: &str) {
 
 pub fn ffmpeg_demuxer_create_from_json<T>(
     demuxerf_path: &Path,
-    json_mux: T,
-) -> Result<(), Box<dyn Error>>
-where
-    T: Iterator<Item = (String, f64)> + Clone,
+    json_mux: &[(String, T)],
+) -> Result<(), Box<dyn Error>> where T: std::fmt::Display
 {
     let demuxerf = std::fs::File::create(demuxerf_path)?;
     let mut demuxerf = std::io::BufWriter::new(demuxerf);
     demuxerf.write_all(b"ffconcat version 1.0\n")?;
-    for i in json_mux.clone() {
+    for i in json_mux {
         demuxerf.write_all(format!("file \'{}\'\nduration {}\n", i.0, i.1,).as_bytes())?;
     }
-    let json_mux_last_f = &json_mux.last().unwrap().0;
-    demuxerf.write_all(("file ".to_string() + &json_mux_last_f + "\n").as_bytes())?;
+    demuxerf.write_all(("file ".to_string() + &json_mux.last().unwrap().0 + "\n").as_bytes())?;
     demuxerf.flush()?;
     Ok(())
 }
