@@ -1,5 +1,6 @@
-use clap::AppSettings;
 use std::{error::Error, ffi::OsString, path::Path};
+
+use clap::AppSettings;
 use structopt::StructOpt;
 
 use crate::modules::utils;
