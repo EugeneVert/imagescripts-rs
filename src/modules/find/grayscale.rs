@@ -1,5 +1,6 @@
 use std::{error::Error, ffi::OsString, path::Path};
 
+use image::GenericImageView;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use structopt::StructOpt;
 
@@ -14,7 +15,7 @@ struct Opt {
     #[structopt(short, required = false, default_value = "./grayscale", display_order = 0)]
     out_dir: std::path::PathBuf,
     #[structopt(short, default_value = "5")]
-    threshold: u32,
+    threshold: u8,
     #[structopt(long, default_value = "0")]
     nproc: usize,
 }
@@ -25,10 +26,10 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let mut images = opt.input.to_owned();
     utils::ims_init(&mut images, opt.out_dir.as_path(), Some(opt.nproc));
 
-    images
-        .iter()
-        .par_bridge()
-        .for_each(|img| process_image(&img, opt.out_dir.as_path(), &opt).expect(&(img.to_string() + "  Error processing image")));
+    images.iter().par_bridge().for_each(|img| {
+        process_image(&img, opt.out_dir.as_path(), &opt)
+            .expect(&(img.to_string() + "  Error processing image"))
+    });
 
     Ok(())
 }
@@ -37,7 +38,7 @@ fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), 
     println!("File: {}", img);
     let img_image = image::open(&img)?;
 
-    if !image_is_colorfull(img_image, opt.threshold) {
+    if !image_is_colorful(img_image, opt.threshold) {
         let save_path = Path::new(out_dir).join(Path::new(img).file_name().unwrap());
         std::fs::rename(img, save_path)?;
     }
@@ -45,36 +46,45 @@ fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), 
     Ok(())
 }
 
-fn image_is_colorfull(img: image::DynamicImage, threshold: u32) -> bool {
-    let thumb_size = 32;
+/// Returns 'true' if any pixel of image has chroma over theshold
+fn pixels_chroma_threshold<T>(pixels: T, threshold: &u8) -> bool
+where
+    T: Iterator<Item = [u8; 3]>,
+{
+    for p in pixels {
+        let r = p[0];
+        let g = p[1];
+        let b = p[2];
+        let max = std::cmp::max(std::cmp::max(r, g), b);
+        let min = std::cmp::min(std::cmp::min(r, g), b);
+        let chroma: u8 = max - min;
+        if &chroma > threshold {
+            return true;
+        }
+    }
+    false
+}
+
+/// Checks if any pixel of a resized image has chroma over the threshold
+fn image_is_colorful(img: image::DynamicImage, threshold: u8) -> bool {
+    let dim = img.dimensions();
+    let dim = std::cmp::max(dim.0, dim.1);
+    let thumb_size;
+    if dim.le(&2048) {
+        thumb_size = 16;
+    } else {
+        thumb_size = 32;
+    }
     if img.color().has_color() {
+        // resize image
         let thumb = image::imageops::resize(
             &img.into_rgb8(),
             thumb_size,
             thumb_size,
             image::imageops::Nearest,
         );
-
-        let mut is_colorfull = false;
-        let res = thumb.pixels().par_bridge().find_map_any(|pix| {
-            let pix = pix.0;
-            let pix_r = *pix.get(0).unwrap() as i32;
-            let pix_g = *pix.get(1).unwrap() as i32;
-            let pix_b = *pix.get(2).unwrap() as i32;
-            if std::cmp::max(
-                std::cmp::max((pix_r - pix_g).abs(), (pix_r - pix_b).abs()),
-                (pix_g - pix_b).abs(),
-            ) > threshold as i32
-            {
-                return Some(());
-            }
-            None
-        });
-        if res.is_some() {
-            is_colorfull = true;
-        }
-        return is_colorfull;
+        // is chroma over theshold?
+        return pixels_chroma_threshold(thumb.pixels().map(|p| p.0), &threshold);
     }
-    //else
     true
 }
