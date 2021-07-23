@@ -7,6 +7,7 @@ use std::{
     path::Path,
 };
 
+use clap::AppSettings;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use structopt::StructOpt;
 
@@ -16,6 +17,7 @@ type BytesIO = Vec<u8>;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "imagescripts-rs", about = " ")]
+#[structopt(setting = AppSettings::ColoredHelp)]
 struct Opt {
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<String>,

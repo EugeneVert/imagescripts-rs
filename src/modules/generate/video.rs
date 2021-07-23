@@ -1,8 +1,4 @@
-use std::cmp::Eq;
-use std::collections::HashMap;
-use std::hash::Hash;
-use std::path::Path;
-use std::{error::Error, ffi::OsString};
+use std::{cmp::Eq, collections::HashMap, error::Error, ffi::OsString, hash::Hash, path::Path};
 
 use clap::AppSettings;
 use structopt::StructOpt;
@@ -23,7 +19,7 @@ struct Opt {
     #[structopt(long = "bg", default_value = "Black")]
     background: String,
 
-    /// ffmpeg arguments (or preset name ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"])
+    /// ffmpeg arguments (or preset name ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] )
     #[structopt(short, long = "ffmpeg", default_value = "aom-av1")]
     ffmpeg_args: String,
     #[structopt(long = "p:crf", default_value = "17")]

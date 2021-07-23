@@ -1,5 +1,6 @@
 use std::{error::Error, ffi::OsString, path::Path};
 
+use clap::AppSettings;
 use image::GenericImageView;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use structopt::StructOpt;
@@ -9,6 +10,7 @@ use crate::modules::utils;
 #[rustfmt::skip]
 #[derive(StructOpt, Debug)]
 #[structopt(name = "imagescripts-rs find", about = " ")]
+#[structopt(setting = AppSettings::ColoredHelp)]
 struct Opt {
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<String>,

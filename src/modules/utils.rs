@@ -71,6 +71,7 @@ impl VideoOpts {
 
     /// Returns preset args for ffmpeg if 'args' is preset name. Else returns 'args'
     /// If container is "", assigns preset_container to container
+    // TODO toml config
     pub fn args_match(&mut self) {
         let preset_container: &str;
         let preset_two_pass: bool;
@@ -155,7 +156,9 @@ fn ffmpeg_cmd_run(ffmpeg_cmd: &str) {
 pub fn ffmpeg_demuxer_create_from_json<T>(
     demuxerf_path: &Path,
     json_mux: &[(String, T)],
-) -> Result<(), Box<dyn Error>> where T: std::fmt::Display
+) -> Result<(), Box<dyn Error>>
+where
+    T: std::fmt::Display,
 {
     let demuxerf = std::fs::File::create(demuxerf_path)?;
     let mut demuxerf = std::io::BufWriter::new(demuxerf);
