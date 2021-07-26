@@ -88,5 +88,5 @@ fn image_is_colorful(img: image::DynamicImage, threshold: u8) -> bool {
         // is chroma over theshold?
         return pixels_chroma_threshold(thumb.pixels().map(|p| p.0), &threshold);
     }
-    true
+    false
 }
