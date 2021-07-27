@@ -77,12 +77,12 @@ impl VideoOpts {
         let preset_two_pass: bool;
         let ffmpegargs = match self.args.as_str() {
             "x264" => {
-                preset_container = "mkv";
+                preset_container = "mp4";
                 preset_two_pass = false;
                 "-c:v libx264 -pix_fmt yuv444p -preset veryslow -tune animation -deblock -1:-1"
             }
             "x265" => {
-                preset_container = "mkv";
+                preset_container = "mp4";
                 preset_two_pass = true;
                 "-c:v libx265 -pix_fmt yuv444p -preset veryslow -tune animation -x265-params bframes=8:psy-rd=1:aq-mode=3:aq-strength=0.8:deblock=-3,-3"
             }
