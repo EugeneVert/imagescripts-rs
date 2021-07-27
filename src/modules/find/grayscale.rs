@@ -57,8 +57,8 @@ where
         let r = p[0];
         let g = p[1];
         let b = p[2];
-        let max = std::cmp::max(std::cmp::max(r, g), b);
-        let min = std::cmp::min(std::cmp::min(r, g), b);
+        let max = core::cmp::max(core::cmp::max(r, g), b);
+        let min = core::cmp::min(core::cmp::min(r, g), b);
         let chroma: u8 = max - min;
         if &chroma > threshold {
             return true;
@@ -70,7 +70,7 @@ where
 /// Checks if any pixel of a resized image has chroma over the threshold
 fn image_is_colorful(img: image::DynamicImage, threshold: u8) -> bool {
     let dim = img.dimensions();
-    let dim = std::cmp::max(dim.0, dim.1);
+    let dim = core::cmp::max(dim.0, dim.1);
     let thumb_size;
     if dim.le(&2048) {
         thumb_size = 16;
