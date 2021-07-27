@@ -449,7 +449,6 @@ fn image_remove_alpha(img: &Path) -> Result<tempfile::NamedTempFile, Box<dyn Err
     // let img = image::open(img)?.to_rgb8();
     // img.save_with_format(tf.path(), image::ImageFormat::Png)?;
 
-    // ImageMagick gives back accurate image
     let outp = std::process::Command::new("convert")
         .arg(img)
         .args(["-alpha", "off"])
