@@ -12,10 +12,10 @@ struct Opt {
     #[structopt(display_order = 0)]
     input: String,
 
-    /// ffmpeg arguments (or preset name)
-    #[structopt(short, long = "ffmpeg", default_value = "aom-av1")]
+    /// ffmpeg arguments (or preset name {n} ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] )
+    #[structopt(short, long = "ffmpeg", default_value = "x264")]
     ffmpeg_args: String,
-    #[structopt(long = "p:crf", default_value = "18")]
+    #[structopt(long = "p:crf", default_value = "17")]
     preset_crf: f32,
     #[structopt(short, long = "container")]
     container: Option<String>,
@@ -50,27 +50,23 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         .expect("No 'js' or 'json' file in zip")
         .unwrap()
         .path();
-    let animdata_file = std::fs::File::open(animdata_path)?;
+    let animdata_file = std::fs::File::open(&animdata_path)?;
 
-    // let animdata_type_1 = "animations.json".to_string();
-    // let animdata_type_2 = format!(
-    //     "{}.js",
-    //     std::path::Path::new(&opt.input)
-    //         .file_stem()
-    //         .unwrap()
-    //         .to_string_lossy()
-    // );
-    // let animdata_type: u8 = match animdata_path.file_name().unwrap().to_str().unwrap() {
-    //     animdata_type_1 => 1,
-    //     animdata_type_2 => 2,
-    //     _ => return Err("Can't find animation data".into()),
-    // };
+    let animdata_type: u8 = match animdata_path.extension().unwrap().to_str().unwrap() {
+        "json" => 1,
+        "js" => 2,
+        _ => return Err("Can't find animation data".into()),  // TODO better animdata_type matching
+    };
 
     let json: HashMap<String, serde_json::Value> = serde_json::from_reader(animdata_file)?;
-    let json_frames = &json.into_iter().next().unwrap().1["frames"]
-        .as_array()
-        .unwrap()
-        .clone();
+    let json_frames = match animdata_type {
+        1 => json.into_iter().next().unwrap().1["frames"]
+            .as_array()
+            .unwrap()
+            .clone(),
+        2 => json["frames"].as_array().unwrap().clone(),
+        _ => panic!(),
+    };
     let json_mux: Vec<(String, f64)> = json_frames
         .iter()
         .map(|x| {
