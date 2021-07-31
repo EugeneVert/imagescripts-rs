@@ -2,7 +2,7 @@
 
 use std::{
     error::Error,
-    ffi::OsString,
+    ffi::{OsStr, OsString},
     io::{BufRead, Write},
     path::Path,
 };
@@ -60,7 +60,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     }
 
     let mut images = opt.input.to_owned();
-    utils::ims_init(&mut images, &opt.out_dir, Some(opt.nproc));
+    utils::ims_init(&mut images, &opt.out_dir, Some(opt.nproc))?;
 
     if opt.save_csv {
         let csv_file = std::fs::OpenOptions::new()
@@ -82,7 +82,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         csv_writer.write_record(csv_row)?;
         csv_writer.flush()?;
     }
-    
+
     for img in images {
         process_image(&img, &csv_path, &opt, &opt_metrics)?;
     }
@@ -98,7 +98,7 @@ fn process_image(
     opt_metrics: &ImageMetricsOptions,
 ) -> Result<(), Box<dyn Error>> {
     println!("{}", &img);
-    let img_filesize = Path::new(img).metadata().unwrap().len() as u32;
+    let img_filesize = Path::new(img).metadata()?.len() as u32;
     let img_dimensions = image::image_dimensions(&img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
 
@@ -110,7 +110,7 @@ fn process_image(
         .par_iter()
         .map(|cmd| {
             let mut buff = ImageBuffer::new();
-            buff.image_generate(&img, &cmd);
+            buff.image_generate(&img, &cmd).unwrap();
             buff
         })
         .collect();
@@ -172,12 +172,10 @@ fn process_image(
             if opt_metrics.ssimulacra {
                 let m = opt_metrics.ssimulacra_run(&img_wa_path, &img_distorted_path)?;
                 let ssimulacra = &m;
-                printing_status = printing_status
-                    + "ssimulacra: "
-                    + ssimulacra
+                printing_status = printing_status + "ssimulacra: " + ssimulacra
             }
         }
-        
+
         println!("{}", printing_status);
 
         if save_csv {
@@ -190,7 +188,10 @@ fn process_image(
             }
             let save_path = out_dir.join(format!(
                 "{}_{}.{}",
-                Path::new(img).file_stem().unwrap().to_str().unwrap(),
+                Path::new(img)
+                    .file_stem()
+                    .and_then(OsStr::to_str)
+                    .ok_or_else(|| String::from("No filestem: ") + img)?,
                 i.to_string(),
                 &buff.ext
             ));
@@ -222,11 +223,14 @@ fn process_image(
     // save res
     let save_path = out_dir.join(format!(
         "{}.{}",
-        Path::new(img).file_stem().unwrap().to_str().unwrap(),
+        Path::new(img)
+            .file_stem()
+            .and_then(OsStr::to_str)
+            .ok_or_else(|| String::from("No filestem: ") + img)?,
         &res_buff.ext
     ));
     let mut f = std::fs::File::create(save_path)?;
-    f.write_all(&res_buff.image[..]).unwrap();
+    f.write_all(&res_buff.image[..])?;
 
     Ok(())
 }
@@ -283,6 +287,7 @@ impl ImageMetricsOptions {
         Ok(outp
             .stdout
             .lines()
+            // write '-' to csv if no output
             .map(|l| l.unwrap_or_else(|_| "-".into()))
             .collect())
     }
@@ -296,8 +301,7 @@ impl ImageMetricsOptions {
             .stdout
             .lines()
             .next()
-            .unwrap_or_else(|| Result::Ok("-".into()))
-            .unwrap())
+            .unwrap_or_else(|| Result::Ok("-".into()))?)
     }
 }
 
@@ -335,23 +339,24 @@ impl ImageBuffer {
         self.cmd_enc.to_string() + " " + &self.cmd_enc_args.join(" ")
     }
 
-    fn image_generate(&mut self, img_path: &str, cmd: &str) {
+    fn image_generate(&mut self, img_path: &str, cmd: &str) -> Result<(), Box<dyn Error>> {
         let cmd_args: Vec<String> = cmd.split(">:").map(|s| s.to_owned()).collect();
         let time_start = std::time::Instant::now();
 
         if cmd_args.len().eq(&1) {
-            self.image_generate_preset(img_path, cmd);
+            self.image_generate_preset(img_path, cmd)?;
         } else {
-            self.image_generate_custom(img_path, cmd_args);
+            self.image_generate_custom(img_path, &cmd_args)?;
         }
         self.ex_time = time_start.elapsed();
+        Ok(())
     }
 
-    fn image_generate_preset(&mut self, img_path: &str, cmd: &str) {
-        let cmd_preset = cmd.split_once(":").expect("Cmd argument error").0;
+    fn image_generate_preset(&mut self, img_path: &str, cmd: &str) -> Result<(), Box<dyn Error>> {
+        let cmd_preset = cmd.split_once(":").ok_or("Cmd argument error")?.0;
         self.cmd_enc_args = cmd
             .split_once(":")
-            .unwrap()
+            .ok_or("Cmd subargument error")?
             .1
             .split(' ')
             .map(|s| s.to_owned())
@@ -381,21 +386,22 @@ impl ImageBuffer {
             }
             _ => panic!("match error, cmd '{}' not supported", &cmd_preset),
         }
-        self.gen_from_cmd(img_path).unwrap();
+        self.gen_from_cmd(img_path)?;
+        Ok(())
     }
 
-    fn image_generate_custom(&mut self, img_path: &str, cmd_args: Vec<String>) {
-        self.cmd_enc_args = cmd_args
-            .get(4)
-            .unwrap()
-            .split(' ')
-            .map(|s| s.to_owned())
-            .collect();
-        self.ext = cmd_args.get(0).unwrap().into();
-        self.cmd_enc = cmd_args.get(1).unwrap().into();
-        self.cmd_dec = cmd_args.get(2).unwrap().into();
-        self.cmd_enc_output_from_stdout = cmd_args.get(3).unwrap().parse::<u8>().unwrap().ne(&0);
-        self.gen_from_cmd(img_path).unwrap();
+    fn image_generate_custom(
+        &mut self,
+        img_path: &str,
+        cmd_args: &[String],
+    ) -> Result<(), Box<dyn Error>> {
+        self.cmd_enc_args = cmd_args[4].split(' ').map(|s| s.to_owned()).collect();
+        self.ext = cmd_args[0].to_string();
+        self.cmd_enc = cmd_args[1].to_string();
+        self.cmd_dec = cmd_args[2].to_string();
+        self.cmd_enc_output_from_stdout = cmd_args[3].parse::<u8>()?.ne(&0);
+        self.gen_from_cmd(img_path)?;
+        Ok(())
     }
 
     fn image_decode(&self) -> Result<tempfile::NamedTempFile, Box<dyn Error>> {
@@ -420,23 +426,20 @@ impl ImageBuffer {
             let output = std::process::Command::new(&self.cmd_enc)
                 .args(&self.cmd_enc_args)
                 .arg(img_path)
-                .output()
-                .unwrap();
+                .output()?;
             self.image = output.stdout;
         } else {
             let buffer = tempfile::Builder::new()
                 .suffix(&format!(".{}", self.ext))
-                .tempfile()
-                .unwrap();
+                .tempfile()?;
             let outp = std::process::Command::new(&self.cmd_enc)
                 .arg(img_path)
                 .args(&self.cmd_enc_args)
                 .arg(buffer.path())
-                .output()
-                .unwrap();
+                .output()?;
             command_print_if_error(&outp)?;
-            self.image = std::fs::read(buffer.path()).unwrap();
-            buffer.close().unwrap();
+            self.image = std::fs::read(buffer.path())?;
+            buffer.close()?;
             // println!("{}", std::str::from_utf8(&output.stderr).unwrap());
         }
         Ok(())
@@ -458,7 +461,7 @@ fn image_remove_alpha(img: &Path) -> Result<tempfile::NamedTempFile, Box<dyn Err
     Ok(tf)
 }
 
-fn command_print_if_error(output: &std::process::Output) -> Result<(), Box<dyn Error>> {
+fn command_print_if_error(output: &std::process::Output) -> Result<(), String> {
     if output.status.success() {
         Ok(())
     } else {

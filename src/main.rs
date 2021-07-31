@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(x) => x.to_str().unwrap(),
         None => "None",
     };
-    println!("{:?} {:?}", selector_module, selector_submodule);
+    println!("{} {}", selector_module, selector_submodule);
 
     let args_ind;
     if ["cmds", "size"].contains(&selector_module) {

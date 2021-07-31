@@ -39,12 +39,12 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_iter(args);
 
     let mut images = opt.input.to_owned();
-    if images.get(0).unwrap() == "./*" {
+    if &images[0] == "./*" {
         utils::input_get_from_cwd(&mut images);
         utils::input_filter_images(&mut images);
     }
 
-    let dimm = get_video_dimm_from_images(&images).unwrap();
+    let dimm = get_video_dimm_from_images(&images).expect("Can't calculate frequent image dimms");
 
     let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, opt.container, opt.two_pass);
     videoopts.args_match();
@@ -62,17 +62,17 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         &videoopts.ffmpeg_args,
         &dimm.0,
         &dimm.1,
-        demuxer_path = &demuxerf_path.to_str().unwrap(),
+        demuxer_path = &demuxerf_path.display(),
         fps = &opt.fps,
         background = &opt.background,
     );
 
-    let container = videoopts.container.expect("No video container specified");
-    let two_pass = videoopts.two_pass.unwrap();
+    let container = videoopts.container.expect("No video container");
+    let two_pass = videoopts.two_pass.expect("No encoder passes count");
     let output_filestem = Path::new(&images[0])
         .file_stem()
         .and_then(|x| x.to_str())
-        .unwrap();
+        .ok_or_else(|| String::from("No filestem: ") + &images[0])?;
     utils::ffmpeg_run(&ffmpeg_cmd, &output_filestem, two_pass, &container);
 
     Ok(())

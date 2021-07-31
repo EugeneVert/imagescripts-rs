@@ -1,6 +1,10 @@
 use std::{error::Error, io::Write, path::Path};
 
-pub fn ims_init(input: &mut Vec<String>, output_dir: &std::path::Path, nproc: Option<usize>) {
+pub fn ims_init(
+    input: &mut Vec<String>,
+    output_dir: &std::path::Path,
+    nproc: Option<usize>,
+) -> Result<(), Box<dyn Error>> {
     if input.get(0).unwrap() == "./*" {
         input_get_from_cwd(input);
         input_filter_images(input);
@@ -9,9 +13,9 @@ pub fn ims_init(input: &mut Vec<String>, output_dir: &std::path::Path, nproc: Op
     if let Some(n) = nproc {
         rayon::ThreadPoolBuilder::new()
             .num_threads(n)
-            .build_global()
-            .unwrap()
+            .build_global()?
     }
+    Ok(())
 }
 
 pub fn mkdir(dir: &std::path::Path) {
@@ -39,8 +43,8 @@ pub fn input_get_from_cwd(input: &mut Vec<String>) {
     input.append(
         &mut std::path::Path::new(".")
             .read_dir()
-            .unwrap()
-            .map(|x| x.unwrap().path().into_os_string().into_string().unwrap())
+            .expect("Can't read dir")
+            .map(|x| x.unwrap().path().to_str().unwrap().to_string())
             .collect::<Vec<String>>(),
     );
     input.remove(0);

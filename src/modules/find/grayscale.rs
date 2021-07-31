@@ -26,7 +26,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_iter(args);
 
     let mut images = opt.input.to_owned();
-    utils::ims_init(&mut images, opt.out_dir.as_path(), Some(opt.nproc));
+    utils::ims_init(&mut images, opt.out_dir.as_path(), Some(opt.nproc))?;
 
     images.iter().par_bridge().for_each(|img| {
         process_image(&img, opt.out_dir.as_path(), &opt)

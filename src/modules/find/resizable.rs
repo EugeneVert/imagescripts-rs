@@ -1,6 +1,6 @@
 use std::{
     error::Error,
-    ffi::OsString,
+    ffi::{OsStr, OsString},
     path::{Path, PathBuf},
 };
 
@@ -38,7 +38,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     utils::mkdir(&paths.out_dir_png_size);
 
     let mut images = opt.input.to_owned();
-    utils::ims_init(&mut images, &paths.out_dir, Some(opt.nproc));
+    utils::ims_init(&mut images, &paths.out_dir, Some(opt.nproc))?;
 
     images
         .iter()
@@ -60,7 +60,10 @@ struct Paths {
 
 fn process_image(img: &str, paths: &Paths, opt: &Opt) -> Result<(), Box<dyn Error>> {
     let img_dimmensions = image::image_dimensions(&img)?;
-    let img_filename = Path::new(img).file_name().unwrap().to_str().unwrap();
+    let img_filename = Path::new(img)
+        .file_name()
+        .and_then(OsStr::to_str)
+        .ok_or_else(|| String::from("Can't get image filename: ") + img)?;
     let save_path: Option<PathBuf>;
     println!("File: {}\nSize: {:?}", img, img_dimmensions);
 
