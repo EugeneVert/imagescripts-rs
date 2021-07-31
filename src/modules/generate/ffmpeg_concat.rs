@@ -17,7 +17,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_iter(args);
 
     let mut images = opt.input;
-    if images.get(0).unwrap() == "./*" {
+    if &images[0] == "./*" {
         utils::input_get_from_cwd(&mut images);
         utils::input_filter_images(&mut images);
     }
