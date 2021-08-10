@@ -42,6 +42,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     if &images[0] == "./*" {
         utils::input_get_from_cwd(&mut images)?;
         utils::input_filter_images(&mut images);
+        images.sort_unstable()
     }
 
     let dimm = get_video_dimm_from_images(&images).expect("Can't calculate frequent image dimms");
