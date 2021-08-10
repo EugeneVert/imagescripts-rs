@@ -34,8 +34,8 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         out_dir_png: PathBuf::from("./PNG"),
         out_dir_png_size: Path::new("./PNG").join(opt.png_px_size.to_string()),
     };
-    utils::mkdir(&paths.out_dir_png);
-    utils::mkdir(&paths.out_dir_png_size);
+    utils::mkdir(&paths.out_dir_png)?;
+    utils::mkdir(&paths.out_dir_png_size)?;
 
     let mut images = opt.input.to_owned();
     utils::ims_init(&mut images, &paths.out_dir, Some(opt.nproc))?;

@@ -18,7 +18,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
     let mut images = opt.input;
     if &images[0] == "./*" {
-        utils::input_get_from_cwd(&mut images);
+        utils::input_get_from_cwd(&mut images)?;
         utils::input_filter_images(&mut images);
     }
     let demuxerf_path = Path::new("./concat_demuxer");
