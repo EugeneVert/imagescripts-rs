@@ -6,10 +6,10 @@ pub fn ims_init(
     nproc: Option<usize>,
 ) -> Result<(), Box<dyn Error>> {
     if input.get(0).unwrap() == "./*" {
-        input_get_from_cwd(input);
+        input_get_from_cwd(input)?;
         input_filter_images(input);
     }
-    mkdir(output_dir);
+    mkdir(output_dir)?;
     if let Some(n) = nproc {
         rayon::ThreadPoolBuilder::new()
             .num_threads(n)
@@ -18,11 +18,14 @@ pub fn ims_init(
     Ok(())
 }
 
-pub fn mkdir(dir: &std::path::Path) {
+pub fn mkdir(dir: &std::path::Path) -> Result<(), std::string::String> {
     if !Path::new(dir).exists() {
-        std::fs::create_dir_all(dir)
-            .unwrap_or_else(|_| panic!("Error creating dir {}", dir.as_os_str().to_str().unwrap()));
-    }
+        match std::fs::create_dir_all(dir) {
+            Ok(_) => return Ok(()),
+            Err(_) => return Err(String::from("Error creating dir: ") + dir.as_os_str().to_str().unwrap()),
+        };
+    };
+    Ok(())
 }
 
 /// Gather image-files from cwd, remove 1'st element from input Vec
@@ -39,15 +42,15 @@ pub fn mkdir(dir: &std::path::Path) {
 ///     images_get_from_cwd(&mut images);
 /// }
 /// ```
-pub fn input_get_from_cwd(input: &mut Vec<String>) {
+pub fn input_get_from_cwd(input: &mut Vec<String>) -> Result<(), std::io::Error> {
     input.append(
         &mut std::path::Path::new(".")
-            .read_dir()
-            .expect("Can't read dir")
-            .map(|x| x.unwrap().path().to_str().unwrap().to_string())
-            .collect::<Vec<String>>(),
+            .read_dir()?
+            .map(|r| r.map(|d| d.path().to_str().unwrap().to_string()))
+            .collect::<Result<Vec<String>, _>>()?,
     );
     input.remove(0);
+    Ok(())
 }
 
 pub fn input_filter_images(input: &mut Vec<String>) {
