@@ -2,7 +2,7 @@
 pub mod modules {
     pub mod find {
         pub mod bpp;
-        pub mod grayscale;
+        pub mod monochrome;
         pub mod resizable;
     }
     pub mod generate {
