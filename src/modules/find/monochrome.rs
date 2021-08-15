@@ -15,7 +15,7 @@ use crate::modules::utils;
 struct Opt {
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<String>,
-    #[structopt(short, required = false, default_value = "./grayscale", display_order = 0)]
+    #[structopt(short, required = false, default_value = "./monochrome", display_order = 0)]
     out_dir: std::path::PathBuf,
     #[structopt(short, default_value = "0.1")]
     threshold: f32,

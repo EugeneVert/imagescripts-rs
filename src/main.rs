@@ -29,8 +29,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "find" => {
             match selector_submodule {
                 "bpp" => modules::find::bpp::main(args4module)?,
-                "grayscale" => modules::find::grayscale::main(args4module)?,
-                "resizeble" => modules::find::resizable::main(args4module)?,
+                "monochrome" => modules::find::monochrome::main(args4module)?,
+                "resizable" => modules::find::resizable::main(args4module)?,
                 // "samesize" => {}
                 // "simmilar" => {}
                 _ => (print_err(&selector_submodule)),
@@ -56,8 +56,8 @@ Avaible options:
     cmds
     find ---\\
         bpp
-        grayscale
-        resizeble
+        monochrome
+        resizable
     gen  ---\\
         ffmpeg_concat
         video
