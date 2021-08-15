@@ -21,6 +21,8 @@ struct Opt {
     px_size: u32,
     #[structopt(long = "p")]
     png_sort: bool,
+    #[structopt(long)]
+    keep_empty: bool,
     #[structopt(long = "p:s", default_value="1754")]
     png_px_size: u32,
     #[structopt(long, default_value = "0")]
@@ -43,11 +45,13 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     images
         .iter()
         .par_bridge()
-        .for_each(|img| process_image(&img, &paths, &opt).unwrap());
+        .for_each(|img| process_image(&img, &paths, &opt).expect(&(String::from("Can't process image: ") + img)));
 
-    dir_del_if_empty(&paths.out_dir_png_size)?;
-    dir_del_if_empty(&paths.out_dir_png)?;
-    dir_del_if_empty(&paths.out_dir)?;
+    if !opt.keep_empty {
+        dir_del_if_empty(&paths.out_dir_png_size)?;
+        dir_del_if_empty(&paths.out_dir_png)?;
+        dir_del_if_empty(&paths.out_dir)?;
+    }
 
     Ok(())
 }
@@ -86,7 +90,7 @@ fn process_image(img: &str, paths: &Paths, opt: &Opt) -> Result<(), Box<dyn Erro
     Ok(())
 }
 
-fn dir_del_if_empty(d: &Path) -> Result<(), Box<dyn Error>> {
+fn dir_del_if_empty(d: &Path) -> Result<(), std::io::Error> {
     if std::fs::read_dir(d)?.count() == 0 {
         println!("Rm dir: {:?}", &d);
         std::fs::remove_dir(d)?;
