@@ -64,9 +64,37 @@ ims-rs gen video -f x264 -c mkv
 
 ### Animation from `.zip`: frames + json (`zip2video`)
 
+The `.js` or `.json` file will be searched in the zip file (w/ any name) or the folder with the zip file (name of zip + .js/.json)
+
+**json structure**
+
+- `.js` :
+
+```json
+{...,
+  "frames": [
+    {
+      "file": "123.png",
+      "delay": 200
+    }, ...] }
+```
+
+- `.json` :
+
+```json
+{"..." :
+  {...,
+    "frames": [
+      {
+        "file": "123.png",
+        "delay": 200
+      }, ...] } }
+```
+
 **Example:**
+
 ```bash
-ims-rs gen zip2video *.zip 
+ims-rs gen zip2video *.zip
 ```
 
 ## Image encoders comparison (`cmds`)
