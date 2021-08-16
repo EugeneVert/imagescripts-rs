@@ -1,5 +1,3 @@
-// TODO parse {}.zip.js file near {}.zip
-
 use std::{
     collections::HashMap,
     error::Error,
@@ -15,7 +13,7 @@ use crate::modules::utils;
 #[derive(StructOpt, Debug)]
 #[structopt(setting = AppSettings::ColoredHelp)]
 struct Opt {
-    /// input zip
+    /// input zip archive
     #[structopt(display_order = 0)]
     input: String,
 
@@ -40,10 +38,11 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
     // extract zip to tempdir
     let zip_file = std::fs::File::open(&opt.input)?;
-    // let zip_file_stem = std::path::Path::new(&opt.input).file_stem().unwrap();
     let mut zip_archive = zip::ZipArchive::new(zip_file)?;
     let tempdir = tempfile::tempdir()?;
     zip_archive.extract(&tempdir)?;
+
+    // try gather demuxer from json file in zip/folder
     let json_mux = match animdata2demux(&opt, &tempdir) {
         Ok(x) => x,
         Err(e) => {
@@ -51,6 +50,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
             return Err(e);
         }
     };
+    // create options for encding video
     let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, opt.container, opt.two_pass);
     videoopts.args_match();
     if videoopts.args_ispreset() {
@@ -74,6 +74,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Creates ffmpeg demuxer from json file in extracted zip or json from file near zip
 fn animdata2demux(
     opt: &Opt,
     tempdir: &tempfile::TempDir,
@@ -83,7 +84,8 @@ fn animdata2demux(
     if animdata_path.is_none() {
         animdata_search_in_folder(opt, &mut animdata_path);
     }
-    let animdata_path = animdata_path.ok_or("No 'js' or 'json' file in zip or ''.zip + js/json file in folder")?;
+    let animdata_path =
+        animdata_path.ok_or("No 'js' or 'json' file in zip or ''.zip + js/json file in folder")?;
     let animdata_file = std::fs::File::open(&animdata_path)?;
     let animdata_type: u8 = match animdata_path.extension().and_then(OsStr::to_str).unwrap() {
         "json" => 1,
@@ -109,6 +111,7 @@ fn animdata2demux(
     Ok(json_mux)
 }
 
+/// search animdata in zip archive extracted to tempdir
 fn animdata_search_in_zip(
     tempdir: &tempfile::TempDir,
     animdata_path: &mut Option<std::path::PathBuf>,
@@ -128,6 +131,7 @@ fn animdata_search_in_zip(
     Ok(())
 }
 
+/// search animdata file in folder, next to input zip archive, which is named {}.zip.js or {}.zip.json
 fn animdata_search_in_folder(opt: &Opt, animdata_path: &mut Option<std::path::PathBuf>) {
     let animdata_path_pathbuf_json = std::path::PathBuf::from(opt.input.clone() + ".json");
     if animdata_path_pathbuf_json.exists() {

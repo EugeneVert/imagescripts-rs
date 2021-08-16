@@ -18,6 +18,7 @@ struct Opt {
     #[structopt(short, required = false, default_value = "./monochrome", display_order = 0)]
     out_dir: std::path::PathBuf,
     #[structopt(short, default_value = "0.1")]
+    /// MSE cutoff
     threshold: f32,
     #[structopt(long, default_value = "0")]
     nproc: usize,
@@ -50,9 +51,9 @@ fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), 
 }
 
 /// Checks if any pixel of a resized image has chroma over the threshold
-/// https://en.wikipedia.org/wiki/HSL_and_HSV#From_RGB
 fn image_is_colorful(img: image::DynamicImage, threshold: f32) -> bool {
     if img.color().has_color() {
+        // calculate thumbnail size
         let dim = img.dimensions();
         let dim = core::cmp::max(dim.0, dim.1);
         let thumb_size;
@@ -74,11 +75,14 @@ fn image_is_colorful(img: image::DynamicImage, threshold: f32) -> bool {
 }
 
 #[allow(clippy::float_cmp)] // '==' was not used on any calculated value
+/// https://en.wikipedia.org/wiki/HSL_and_HSV#From_RGB
 fn rgb2hsv(rgb: &image::Rgb<u8>) -> [f32; 3] {
     let rgb = rgb.0;
+
     let r = rgb[0] as f32 / 255.0;
     let g = rgb[1] as f32 / 255.0;
     let b = rgb[2] as f32 / 255.0;
+
     let value = f32::max(r, f32::max(g, b));
     let min = f32::min(r, f32::min(g, b));
 
