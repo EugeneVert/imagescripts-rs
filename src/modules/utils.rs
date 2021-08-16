@@ -22,7 +22,9 @@ pub fn mkdir(dir: &std::path::Path) -> Result<(), std::string::String> {
     if !Path::new(dir).exists() {
         match std::fs::create_dir_all(dir) {
             Ok(_) => return Ok(()),
-            Err(_) => return Err(String::from("Error creating dir: ") + dir.as_os_str().to_str().unwrap()),
+            Err(_) => {
+                return Err(String::from("Error creating dir: ") + dir.as_os_str().to_str().unwrap())
+            }
         };
     };
     Ok(())
@@ -127,9 +129,11 @@ impl VideoOpts {
         }
         self.ffmpeg_args = ffmpegargs.into();
     }
+
     pub fn presets_list() -> Vec<&'static str> {
         vec!["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"]
     }
+
     pub fn args_ispreset(&self) -> bool {
         let presets = Self::presets_list();
         presets.contains(&self.args.as_str())

@@ -1,6 +1,6 @@
 [package]
-name = "imagescripts-rs"
-version = "0.1.0"
+name = "ims-rs"
+version = "0.2.0"
 authors = ["Eugene Vert"]
 edition = "2018"
 

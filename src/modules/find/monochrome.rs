@@ -52,15 +52,15 @@ fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), 
 /// Checks if any pixel of a resized image has chroma over the threshold
 /// https://en.wikipedia.org/wiki/HSL_and_HSV#From_RGB
 fn image_is_colorful(img: image::DynamicImage, threshold: f32) -> bool {
-    let dim = img.dimensions();
-    let dim = core::cmp::max(dim.0, dim.1);
-    let thumb_size;
-    if dim.le(&2048) {
-        thumb_size = 32;
-    } else {
-        thumb_size = 64;
-    }
     if img.color().has_color() {
+        let dim = img.dimensions();
+        let dim = core::cmp::max(dim.0, dim.1);
+        let thumb_size;
+        if dim.le(&2048) {
+            thumb_size = 32;
+        } else {
+            thumb_size = 64;
+        }
         // resize image
         let thumb = image::imageops::resize(
             &img.into_rgb8(),
