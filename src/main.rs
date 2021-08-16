@@ -1,4 +1,4 @@
-use imagescripts_rs::modules;
+use ims_rs::modules;
 use std::ffi::OsString;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

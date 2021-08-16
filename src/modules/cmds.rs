@@ -24,7 +24,7 @@ struct Opt {
     #[structopt(short, takes_value = true, default_value = "./out")]
     out_dir: std::path::PathBuf,
     /// avaible presets:    {n}
-    /// "cjxl:{args}", "avif:{args}"   {n}
+    /// "cjxl:{args}", "avif:{args}", "jpeg:{args}", "cwebp:{args}"   {n}
     /// custom cmd format:  {n}
     /// "{encoder}>:{decoder}>:{extension}>:{output_from_stdout [0;1]}:>{args}"
     #[structopt(short, required = true)]
