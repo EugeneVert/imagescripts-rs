@@ -44,38 +44,13 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let mut zip_archive = zip::ZipArchive::new(zip_file)?;
     let tempdir = tempfile::tempdir()?;
     zip_archive.extract(&tempdir)?;
-    // open animation.json from tempdir
-    let mut animdata_path = Some(std::path::PathBuf::new());
-    animdata_search_in_zip(&tempdir, &mut animdata_path)?;
-    if animdata_path.is_none() {
-        animdata_search_in_folder(&opt, &mut animdata_path);
-    }
-    let animdata_path = animdata_path.expect("No 'js' or 'json' file in zip");
-    let animdata_file = std::fs::File::open(&animdata_path)?;
-
-    let animdata_type: u8 = match animdata_path.extension().and_then(OsStr::to_str).unwrap() {
-        "json" => 1,
-        "js" => 2,
-        _ => return Err("Can't find animation data".into()), // TODO better animdata_type matching
+    let json_mux = match animdata2demux(&opt, &tempdir) {
+        Ok(x) => x,
+        Err(e) => {
+            tempdir.close()?;
+            return Err(e);
+        }
     };
-
-    let json: HashMap<String, serde_json::Value> = serde_json::from_reader(animdata_file)?;
-    let json_frames = match animdata_type {
-        1 => json.values().next().unwrap()["frames"].as_array(),
-        2 => json["frames"].as_array(),
-        _ => panic!(),
-    }
-    .expect("Cant't find frames data in js/json file");
-    let json_mux: Vec<(String, f64)> = json_frames
-        .iter()
-        .map(|x| {
-            (
-                x["file"].as_str().unwrap().to_string(),
-                x["delay"].as_i64().unwrap() as f64 / 1000.0,
-            )
-        })
-        .collect();
-
     let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, opt.container, opt.two_pass);
     videoopts.args_match();
     if videoopts.args_ispreset() {
@@ -97,6 +72,41 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     utils::ffmpeg_run(&ffmpeg_cmd, &filestem, two_pass, &container);
 
     Ok(())
+}
+
+fn animdata2demux(
+    opt: &Opt,
+    tempdir: &tempfile::TempDir,
+) -> Result<Vec<(String, f64)>, Box<dyn Error>> {
+    let mut animdata_path = Some(std::path::PathBuf::new());
+    animdata_search_in_zip(tempdir, &mut animdata_path)?;
+    if animdata_path.is_none() {
+        animdata_search_in_folder(opt, &mut animdata_path);
+    }
+    let animdata_path = animdata_path.ok_or("No 'js' or 'json' file in zip or ''.zip + js/json file in folder")?;
+    let animdata_file = std::fs::File::open(&animdata_path)?;
+    let animdata_type: u8 = match animdata_path.extension().and_then(OsStr::to_str).unwrap() {
+        "json" => 1,
+        "js" => 2,
+        _ => return Err("Can't find animation data".into()), // TODO better animdata_type matching
+    };
+    let json: HashMap<String, serde_json::Value> = serde_json::from_reader(animdata_file)?;
+    let json_frames = match animdata_type {
+        1 => json.values().next().unwrap()["frames"].as_array(),
+        2 => json["frames"].as_array(),
+        _ => return Err("Wrong animdata_type".into()),
+    }
+    .expect("Cant't find frames data in js/json file");
+    let json_mux: Vec<(String, f64)> = json_frames
+        .iter()
+        .map(|x| {
+            (
+                x["file"].as_str().unwrap().to_string(),
+                x["delay"].as_i64().unwrap() as f64 / 1000.0,
+            )
+        })
+        .collect();
+    Ok(json_mux)
 }
 
 fn animdata_search_in_zip(
