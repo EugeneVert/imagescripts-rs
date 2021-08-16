@@ -45,18 +45,12 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let tempdir = tempfile::tempdir()?;
     zip_archive.extract(&tempdir)?;
     // open animation.json from tempdir
-    let animdata_path = std::fs::read_dir(&tempdir)?
-        .find(|x| {
-            let x = x.as_ref().unwrap();
-            ["js", "json"].contains(
-                &x.path()
-                    .extension()
-                    .and_then(OsStr::to_str)
-                    .unwrap_or_default(),
-            )
-        })
-        .expect("No 'js' or 'json' file in zip")?
-        .path();
+    let mut animdata_path = Some(std::path::PathBuf::new());
+    animdata_search_in_zip(&tempdir, &mut animdata_path)?;
+    if animdata_path.is_none() {
+        animdata_search_in_folder(&opt, &mut animdata_path);
+    }
+    let animdata_path = animdata_path.expect("No 'js' or 'json' file in zip");
     let animdata_file = std::fs::File::open(&animdata_path)?;
 
     let animdata_type: u8 = match animdata_path.extension().and_then(OsStr::to_str).unwrap() {
@@ -103,4 +97,35 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     utils::ffmpeg_run(&ffmpeg_cmd, &filestem, two_pass, &container);
 
     Ok(())
+}
+
+fn animdata_search_in_zip(
+    tempdir: &tempfile::TempDir,
+    animdata_path: &mut Option<std::path::PathBuf>,
+) -> Result<(), std::io::Error> {
+    let path = std::fs::read_dir(tempdir)?
+        .find(|x| {
+            let x = x.as_ref().unwrap();
+            ["js", "json"].contains(
+                &x.path()
+                    .extension()
+                    .and_then(OsStr::to_str)
+                    .unwrap_or_default(),
+            )
+        })
+        .map(|x| x.unwrap().path());
+    *animdata_path = path;
+    Ok(())
+}
+
+fn animdata_search_in_folder(opt: &Opt, animdata_path: &mut Option<std::path::PathBuf>) {
+    let animdata_path_pathbuf_json = std::path::PathBuf::from(opt.input.clone() + ".json");
+    if animdata_path_pathbuf_json.exists() {
+        *animdata_path = Some(animdata_path_pathbuf_json);
+        return;
+    }
+    let animdata_path_pathbuf_js = std::path::PathBuf::from(opt.input.clone() + ".js");
+    if animdata_path_pathbuf_js.exists() {
+        *animdata_path = Some(animdata_path_pathbuf_js);
+    }
 }
