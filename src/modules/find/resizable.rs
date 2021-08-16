@@ -16,7 +16,7 @@ use crate::modules::utils;
 #[structopt(setting = AppSettings::ColoredHelp)]
 struct Opt {
     #[structopt(required = false, default_value = "./*", display_order = 0)]
-    input: Vec<String>,
+    input: Vec<PathBuf>,
     #[structopt(short = "s", long = "size", required = false, default_value = "3508", display_order = 0)]
     px_size: u32,
     #[structopt(long = "p")]
@@ -42,10 +42,10 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let mut images = opt.input.to_owned();
     utils::ims_init(&mut images, &paths.out_dir, Some(opt.nproc))?;
 
-    images
-        .iter()
-        .par_bridge()
-        .for_each(|img| process_image(&img, &paths, &opt).expect(&(String::from("Can't process image: ") + img)));
+    images.iter().par_bridge().for_each(|img| {
+        process_image(img, &paths, &opt)
+            .unwrap_or_else(|_| panic!("Can't process image: {}", &img.display()))
+    });
 
     if !opt.keep_empty {
         dir_del_if_empty(&paths.out_dir_png_size)?;
@@ -62,14 +62,14 @@ struct Paths {
     out_dir_png_size: PathBuf,
 }
 
-fn process_image(img: &str, paths: &Paths, opt: &Opt) -> Result<(), Box<dyn Error>> {
+fn process_image(img: &Path, paths: &Paths, opt: &Opt) -> Result<(), Box<dyn Error>> {
     let img_dimmensions = image::image_dimensions(&img)?;
-    let img_filename = Path::new(img)
+    let img_filename = img
         .file_name()
         .and_then(OsStr::to_str)
-        .ok_or_else(|| String::from("Can't get image filename: ") + img)?;
+        .ok_or_else(|| format!("Can't get image filename: {}", &img.display()))?;
     let save_path: Option<PathBuf>;
-    println!("File: {}\nSize: {:?}", img, img_dimmensions);
+    println!("File: {}\nSize: {:?}", img.display(), img_dimmensions);
 
     if opt.png_sort && img.ends_with(".png") {
         if img_dimmensions.0 > opt.png_px_size || img_dimmensions.1 > opt.png_px_size {

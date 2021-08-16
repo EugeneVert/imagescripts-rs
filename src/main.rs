@@ -33,18 +33,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "resizable" => modules::find::resizable::main(args4module)?,
                 // "samesize" => {}
                 // "simmilar" => {}
-                _ => (print_err(&selector_submodule)),
+                _ => (print_err(selector_submodule)),
             };
         }
         "gen" => match selector_submodule {
             "ffmpeg_concat" => modules::generate::ffmpeg_concat::main(args4module)?,
             "video" => modules::generate::video::main(args4module)?,
             "zip2video" => modules::generate::zip2video::main(args4module)?,
-            _ => (print_err(&selector_submodule)),
+            _ => (print_err(selector_submodule)),
         },
         "cmds" => modules::cmds::main(args4module)?,
         // TODO: "size" => {}
-        _ => (print_err(&selector_submodule)),
+        _ => (print_err(selector_submodule)),
     };
     Ok(())
 }

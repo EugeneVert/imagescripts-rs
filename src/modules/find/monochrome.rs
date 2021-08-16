@@ -1,5 +1,9 @@
 use core::panic;
-use std::{error::Error, ffi::OsString, path::Path};
+use std::{
+    error::Error,
+    ffi::OsString,
+    path::{Path, PathBuf},
+};
 
 use clap::AppSettings;
 use image::GenericImageView;
@@ -14,9 +18,9 @@ use crate::modules::utils;
 #[structopt(setting = AppSettings::ColoredHelp, setting = AppSettings::AllowNegativeNumbers)]
 struct Opt {
     #[structopt(required = false, default_value = "./*", display_order = 0)]
-    input: Vec<String>,
+    input: Vec<PathBuf>,
     #[structopt(short, required = false, default_value = "./monochrome", display_order = 0)]
-    out_dir: std::path::PathBuf,
+    out_dir: PathBuf,
     #[structopt(short, default_value = "0.1")]
     /// MSE cutoff
     threshold: f32,
@@ -31,19 +35,19 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     utils::ims_init(&mut images, opt.out_dir.as_path(), Some(opt.nproc))?;
 
     images.iter().par_bridge().for_each(|img| {
-        process_image(&img, opt.out_dir.as_path(), &opt)
-            .expect(&(img.to_string() + "  Error processing image"))
+        process_image(img, opt.out_dir.as_path(), &opt)
+            .unwrap_or_else(|_| panic!("Error processing image: {}", &img.display()))
     });
 
     Ok(())
 }
 
-fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    println!("File: {}", img);
+fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    println!("File: {}", img.display());
     let img_image = image::open(&img)?;
 
     if !image_is_colorful(img_image, opt.threshold) {
-        let save_path = Path::new(out_dir).join(Path::new(img).file_name().unwrap());
+        let save_path = out_dir.join(img.file_name().unwrap());
         std::fs::rename(img, save_path)?;
     }
 
@@ -57,7 +61,7 @@ fn image_is_colorful(img: image::DynamicImage, threshold: f32) -> bool {
         let dim = img.dimensions();
         let dim = core::cmp::max(dim.0, dim.1);
         let thumb_size;
-        if dim.le(&2048) {
+        if dim < 2048 {
             thumb_size = 32;
         } else {
             thumb_size = 64;
@@ -124,11 +128,11 @@ fn image_is_monochrome_by_MSE(
     let mut sse = 0.0;
     let mut hue_bias = 0.0;
     if adjust_color_bias {
-        hue_bias = rgb2hsv(&image_mean_color(&image))[0];
+        hue_bias = rgb2hsv(&image_mean_color(image))[0];
     }
 
     for pixel in image.pixels() {
-        let pixel_hsv = rgb2hsv(&pixel);
+        let pixel_hsv = rgb2hsv(pixel);
         if (pixel_hsv[0] - hue_bias).abs() < f32::EPSILON || pixel_hsv[0] < f32::EPSILON {
             continue;
         }

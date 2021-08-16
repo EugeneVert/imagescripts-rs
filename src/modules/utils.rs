@@ -1,11 +1,15 @@
-use std::{error::Error, io::Write, path::Path};
+use std::{
+    error::Error,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 pub fn ims_init(
-    input: &mut Vec<String>,
+    input: &mut Vec<PathBuf>,
     output_dir: &std::path::Path,
     nproc: Option<usize>,
 ) -> Result<(), Box<dyn Error>> {
-    if input.get(0).unwrap() == "./*" {
+    if input[0].to_string_lossy() == "./*" {
         input_get_from_cwd(input)?;
         input_filter_images(input);
     }
@@ -19,7 +23,7 @@ pub fn ims_init(
 }
 
 pub fn mkdir(dir: &std::path::Path) -> Result<(), std::string::String> {
-    if !Path::new(dir).exists() {
+    if !dir.exists() {
         match std::fs::create_dir_all(dir) {
             Ok(_) => return Ok(()),
             Err(_) => {
@@ -36,28 +40,34 @@ pub fn mkdir(dir: &std::path::Path) -> Result<(), std::string::String> {
 /// ```
 /// struct Opt {
 ///     #[structopt(required = false, default_value = "./*", display_order = 0)]
-///     input: Vec<String>,
+///     input: Vec<PathBuf>,
 /// }
 /// let opt = Opt::from_iter(args);
 /// let mut images = opt.input.to_owned();
-/// if images.get(0).unwrap() == "./*" {
-///     images_get_from_cwd(&mut images);
+/// if images[0].to_string_lossy() == "./*" {
+///     utils::input_get_from_cwd(&mut images)?;
+///     utils::input_filter_images(&mut images);
+///     images.sort_unstable()
 /// }
 /// ```
-pub fn input_get_from_cwd(input: &mut Vec<String>) -> Result<(), std::io::Error> {
+pub fn input_get_from_cwd(input: &mut Vec<PathBuf>) -> Result<(), std::io::Error> {
     input.append(
         &mut std::path::Path::new(".")
             .read_dir()?
-            .map(|r| r.map(|d| d.path().to_str().unwrap().to_string()))
-            .collect::<Result<Vec<String>, _>>()?,
+            .map(|r| r.map(|d| d.path()))
+            .collect::<Result<Vec<PathBuf>, _>>()?,
     );
     input.remove(0);
     Ok(())
 }
 
-pub fn input_filter_images(input: &mut Vec<String>) {
+pub fn input_filter_images(input: &mut Vec<PathBuf>) {
     let image_formats = ["png", "jpg", "webp"];
-    input.retain(|i| image_formats.iter().any(|&format| i.ends_with(format)));
+    input.retain(|i| {
+        image_formats
+            .iter()
+            .any(|&format| i.extension().unwrap_or_default() == format)
+    });
 }
 
 #[derive(Clone)]
@@ -69,12 +79,12 @@ pub struct VideoOpts {
 }
 
 impl VideoOpts {
-    pub fn new(args: &str, container: Option<String>, two_pass: Option<bool>) -> VideoOpts {
+    pub fn new(args: &str, container: &Option<String>, two_pass: &Option<bool>) -> VideoOpts {
         VideoOpts {
             args: String::from(args),
-            container,
+            container: container.to_owned(),
             ffmpeg_args: String::new(),
-            two_pass,
+            two_pass: two_pass.to_owned(),
         }
     }
 
@@ -184,15 +194,15 @@ where
 
 pub fn ffmpeg_demuxer_create_from_files(
     demuxerf_path: &Path,
-    input: &[String],
+    input: &[PathBuf],
 ) -> Result<(), Box<dyn Error>> {
     let demuxerf = std::fs::File::create(demuxerf_path)?;
     let mut demuxerf = std::io::BufWriter::new(demuxerf);
     demuxerf.write_all(b"ffconcat version 1.0\n")?;
     for i in input {
-        demuxerf.write_all(("file ".to_string() + i + "\n").as_bytes())?;
+        demuxerf.write_all((format!("file \'{}\'\n", i.display())).as_bytes())?;
     }
-    demuxerf.write_all(("file ".to_string() + &input.last().unwrap() + "\n").as_bytes())?;
+    demuxerf.write_all((format!("file \'{}\'", &input.last().unwrap().display())).as_bytes())?;
     demuxerf.flush()?;
     Ok(())
 }

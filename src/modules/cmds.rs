@@ -4,7 +4,7 @@ use std::{
     error::Error,
     ffi::{OsStr, OsString},
     io::{BufRead, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use clap::AppSettings;
@@ -20,9 +20,9 @@ type BytesIO = Vec<u8>;
 #[structopt(setting = AppSettings::ColoredHelp)]
 struct Opt {
     #[structopt(required = false, default_value = "./*", display_order = 0)]
-    input: Vec<String>,
+    input: Vec<PathBuf>,
     #[structopt(short, takes_value = true, default_value = "./out")]
-    out_dir: std::path::PathBuf,
+    out_dir: PathBuf,
     /// avaible presets:    {n}
     /// "cjxl:{args}", "avif:{args}", "jpeg:{args}", "cwebp:{args}"   {n}
     /// custom cmd format:  {n}
@@ -36,7 +36,7 @@ struct Opt {
     #[structopt(long = "csv")]
     save_csv: bool,
     #[structopt(long = "csv_path", default_value = "./res.csv")]
-    csv_path: String,
+    csv_path: PathBuf,
     #[structopt(long = "metrics")]
     do_metrics: bool,
     #[structopt(long, default_value = "0")]
@@ -84,7 +84,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     }
 
     for img in images {
-        process_image(&img, &csv_path, &opt, &opt_metrics)?;
+        process_image(&img, csv_path, &opt, &opt_metrics)?;
     }
 
     Ok(())
@@ -92,13 +92,13 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
 /// Generate results from cmds and compare/save/output them
 fn process_image(
-    img: &str,
-    csv_path: &str,
+    img: &Path,
+    csv_path: &Path,
     opt: &Opt,
     opt_metrics: &ImageMetricsOptions,
 ) -> Result<(), Box<dyn Error>> {
-    println!("{}", &img);
-    let img_filesize = Path::new(img).metadata()?.len() as u32;
+    println!("{}", &img.display());
+    let img_filesize = img.metadata()?.len() as u32;
     let img_dimensions = image::image_dimensions(&img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
 
@@ -110,7 +110,7 @@ fn process_image(
         .par_iter()
         .map(|cmd| {
             let mut buff = ImageBuffer::new();
-            buff.image_generate(&img, &cmd).unwrap();
+            buff.image_generate(img, cmd).unwrap();
             buff
         })
         .collect();
@@ -126,7 +126,7 @@ fn process_image(
             .write(true)
             .append(true)
             .open(csv_path)?;
-        csv_row.push(img.to_string());
+        csv_row.push(img.to_string_lossy().to_string());
         csv_row.push(img_filesize.to_string());
         Some(
             csv::WriterBuilder::new()
@@ -152,7 +152,7 @@ fn process_image(
             percentage_of_original
         );
         if opt_metrics.do_metrics {
-            let img_wa = image_remove_alpha(Path::new(&img))?;
+            let img_wa = image_remove_alpha(img)?;
             let img_wa_path = img_wa.path().to_str().unwrap().to_string();
             let img_distorted = buff.image_decode()?;
             let img_distorted_wa = image_remove_alpha(img_distorted.path())?;
@@ -188,10 +188,9 @@ fn process_image(
             }
             let save_path = out_dir.join(format!(
                 "{}_{}.{}",
-                Path::new(img)
-                    .file_stem()
+                img.file_stem()
                     .and_then(OsStr::to_str)
-                    .ok_or_else(|| String::from("No filestem: ") + img)?,
+                    .ok_or_else(|| format!("No filestem: {}", img.display()))?,
                 i.to_string(),
                 &buff.ext
             ));
@@ -223,10 +222,9 @@ fn process_image(
     // save res
     let save_path = out_dir.join(format!(
         "{}.{}",
-        Path::new(img)
-            .file_stem()
+        img.file_stem()
             .and_then(OsStr::to_str)
-            .ok_or_else(|| String::from("No filestem: ") + img)?,
+            .ok_or_else(|| format!("No filestem: {}", img.display()))?,
         &res_buff.ext
     ));
     let mut f = std::fs::File::create(save_path)?;
@@ -339,7 +337,7 @@ impl ImageBuffer {
         self.cmd_enc.to_string() + " " + &self.cmd_enc_args.join(" ")
     }
 
-    fn image_generate(&mut self, img_path: &str, cmd: &str) -> Result<(), Box<dyn Error>> {
+    fn image_generate(&mut self, img_path: &Path, cmd: &str) -> Result<(), Box<dyn Error>> {
         let cmd_args: Vec<String> = cmd.split(">:").map(|s| s.to_owned()).collect();
         let time_start = std::time::Instant::now();
 
@@ -352,7 +350,7 @@ impl ImageBuffer {
         Ok(())
     }
 
-    fn image_generate_preset(&mut self, img_path: &str, cmd: &str) -> Result<(), Box<dyn Error>> {
+    fn image_generate_preset(&mut self, img_path: &Path, cmd: &str) -> Result<(), Box<dyn Error>> {
         let cmd_preset = cmd.split_once(":").ok_or("Cmd argument error")?.0;
         self.cmd_enc_args = cmd
             .split_once(":")
@@ -392,7 +390,7 @@ impl ImageBuffer {
 
     fn image_generate_custom(
         &mut self,
-        img_path: &str,
+        img_path: &Path,
         cmd_args: &[String],
     ) -> Result<(), Box<dyn Error>> {
         self.cmd_enc_args = cmd_args[4].split(' ').map(|s| s.to_owned()).collect();
@@ -417,7 +415,7 @@ impl ImageBuffer {
         Ok(tf_out)
     }
 
-    fn gen_from_cmd(&mut self, img_path: &str) -> Result<(), Box<dyn Error>> {
+    fn gen_from_cmd(&mut self, img_path: &Path) -> Result<(), Box<dyn Error>> {
         // no arguments -> return None
         if self.cmd_enc_args.contains(&"".into()) {
             self.cmd_enc_args.pop();

@@ -1,4 +1,11 @@
-use std::{cmp::Eq, collections::HashMap, error::Error, ffi::OsString, hash::Hash, path::Path};
+use std::{
+    cmp::Eq,
+    collections::HashMap,
+    error::Error,
+    ffi::OsString,
+    hash::Hash,
+    path::{Path, PathBuf},
+};
 
 use clap::AppSettings;
 use structopt::StructOpt;
@@ -10,7 +17,7 @@ use crate::modules::utils;
 struct Opt {
     /// input files
     #[structopt(required = false, default_value = "./*", display_order = 0)]
-    input: Vec<String>,
+    input: Vec<PathBuf>,
 
     /// video dimensions
     #[structopt(short = "d")]
@@ -39,7 +46,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_iter(args);
 
     let mut images = opt.input.to_owned();
-    if &images[0] == "./*" {
+    if images[0].to_string_lossy() == "./*" {
         utils::input_get_from_cwd(&mut images)?;
         utils::input_filter_images(&mut images);
         images.sort_unstable()
@@ -47,7 +54,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
     let dimm = get_video_dimm_from_images(&images).expect("Can't calculate frequent image dimms");
 
-    let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, opt.container, opt.two_pass);
+    let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, &opt.container, &opt.two_pass);
     videoopts.args_match();
     if videoopts.args_ispreset() {
         videoopts.ffmpeg_args += format!(" -crf {}", &opt.preset_crf).as_str();
@@ -70,22 +77,22 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
     let container = videoopts.container.expect("No video container");
     let two_pass = videoopts.two_pass.expect("No encoder passes count");
-    let output_filestem = Path::new(&images[0])
+    let output_filestem = images[0]
         .file_stem()
         .and_then(|x| x.to_str())
-        .ok_or_else(|| String::from("No filestem: ") + &images[0])?;
-    utils::ffmpeg_run(&ffmpeg_cmd, &output_filestem, two_pass, &container);
+        .ok_or_else(|| format!("No filestem: {}", images[0].display()))?;
+    utils::ffmpeg_run(&ffmpeg_cmd, output_filestem, two_pass, &container);
 
     Ok(())
 }
 
 /// Get most frequent width & hight from images (DirEntry) array
-fn get_video_dimm_from_images(images: &[String]) -> Option<(u32, u32)> {
+fn get_video_dimm_from_images(images: &[PathBuf]) -> Option<(u32, u32)> {
     let mut images_w = Vec::<u32>::new();
     let mut images_h = Vec::<u32>::new();
     images
         .iter()
-        .map(|i| image::image_dimensions(Path::new(i)).unwrap())
+        .map(|i| image::image_dimensions(i).unwrap())
         .for_each(|d| {
             images_w.push(d.0);
             images_h.push(d.1);
