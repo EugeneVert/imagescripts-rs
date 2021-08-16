@@ -1,4 +1,8 @@
-use std::{error::Error, ffi::OsString, path::Path};
+use std::{
+    error::Error,
+    ffi::OsString,
+    path::{Path, PathBuf},
+};
 
 use clap::AppSettings;
 use rayon::iter::{ParallelBridge, ParallelIterator};
@@ -11,7 +15,7 @@ use crate::modules::utils;
 #[structopt(setting = AppSettings::ColoredHelp)]
 struct Opt {
     #[structopt(required = false, default_value = "./*", display_order = 0)]
-    input: Vec<String>,
+    input: Vec<PathBuf>,
     #[structopt(short, conflicts_with = "bigger")]
     lesser: Option<f32>,
     #[structopt(short, conflicts_with = "lesser")]
@@ -35,7 +39,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     images
         .iter()
         .par_bridge()
-        .for_each(|img| process_image(&img, &out_dir, &opt).unwrap());
+        .for_each(|img| process_image(img, &out_dir, &opt).unwrap());
 
     Ok(())
 }
@@ -47,8 +51,8 @@ fn unwrap_two<T>(l: Option<T>, b: Option<T>) -> T {
     }
 }
 
-fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    let img_filesize = Path::new(img).metadata()?.len();
+fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    let img_filesize = img.metadata()?.len();
     let img_dimensions = image::image_dimensions(&img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
     let img_bpp = (img_filesize * 8) as f32 / px_count as f32;
@@ -60,7 +64,7 @@ fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), 
         img_metric = img_bpp;
     }
 
-    println!("File: {}\n bpp: {:.3}", img, img_metric);
+    println!("File: {}\n bpp: {:.3}", img.display(), img_metric);
     let mut save_flag: bool = false;
     match opt.lesser {
         Some(val) => {
@@ -76,7 +80,7 @@ fn process_image(img: &str, out_dir: &std::path::Path, opt: &Opt) -> Result<(), 
         }
     }
     if save_flag {
-        let save_path = out_dir.join(Path::new(img).file_name().unwrap());
+        let save_path = out_dir.join(img.file_name().unwrap());
         std::fs::rename(img, save_path)?;
     }
 

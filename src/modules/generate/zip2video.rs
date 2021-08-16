@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     error::Error,
     ffi::{OsStr, OsString},
-    path::Path,
+    path::PathBuf,
 };
 
 use clap::AppSettings;
@@ -15,7 +15,7 @@ use crate::modules::utils;
 struct Opt {
     /// input zip archive
     #[structopt(display_order = 0)]
-    input: String,
+    input: PathBuf,
 
     /// ffmpeg arguments (or preset name {n} ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] )
     #[structopt(short, long = "ffmpeg", default_value = "x264")]
@@ -30,11 +30,6 @@ struct Opt {
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_iter(args);
-    let filestem = Path::new(&opt.input)
-        .file_stem()
-        .and_then(OsStr::to_str)
-        .ok_or_else(|| String::from("No filestem") + &opt.input)?;
-    println!("{:?}", &opt);
 
     // extract zip to tempdir
     let zip_file = std::fs::File::open(&opt.input)?;
@@ -51,7 +46,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         }
     };
     // create options for encding video
-    let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, opt.container, opt.two_pass);
+    let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, &opt.container, &opt.two_pass);
     videoopts.args_match();
     if videoopts.args_ispreset() {
         videoopts.ffmpeg_args =
@@ -69,7 +64,12 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
     let container = videoopts.container.expect("No video container");
     let two_pass = videoopts.two_pass.expect("No encoder passes count");
-    utils::ffmpeg_run(&ffmpeg_cmd, &filestem, two_pass, &container);
+    let filestem = opt
+        .input
+        .file_stem()
+        .and_then(OsStr::to_str)
+        .ok_or_else(|| format!("No filestem; {}", &opt.input.display()))?;
+    utils::ffmpeg_run(&ffmpeg_cmd, filestem, two_pass, &container);
 
     Ok(())
 }
@@ -133,12 +133,12 @@ fn animdata_search_in_zip(
 
 /// search animdata file in folder, next to input zip archive, which is named {}.zip.js or {}.zip.json
 fn animdata_search_in_folder(opt: &Opt, animdata_path: &mut Option<std::path::PathBuf>) {
-    let animdata_path_pathbuf_json = std::path::PathBuf::from(opt.input.clone() + ".json");
+    let animdata_path_pathbuf_json = PathBuf::from(format!("{}.json", opt.input.display()));
     if animdata_path_pathbuf_json.exists() {
         *animdata_path = Some(animdata_path_pathbuf_json);
         return;
     }
-    let animdata_path_pathbuf_js = std::path::PathBuf::from(opt.input.clone() + ".js");
+    let animdata_path_pathbuf_js = PathBuf::from(format!("{}.js", opt.input.display()));
     if animdata_path_pathbuf_js.exists() {
         *animdata_path = Some(animdata_path_pathbuf_js);
     }
