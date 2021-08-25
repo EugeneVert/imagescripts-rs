@@ -15,7 +15,7 @@ use crate::modules::utils;
 #[derive(StructOpt, Debug)]
 #[structopt(setting = AppSettings::ColoredHelp)]
 struct Opt {
-    /// input files
+    /// input image paths
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
 
@@ -29,17 +29,18 @@ struct Opt {
     /// ffmpeg arguments (or preset name {n} ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] )
     #[structopt(short, long = "ffmpeg", default_value = "x264")]
     ffmpeg_args: String,
-    #[structopt(long = "p:crf", default_value = "17")]
+    /// preset crf
+    #[structopt(long = "crf", default_value = "17")]
     preset_crf: f32,
+    /// video container
     #[structopt(short, long = "container")]
     container: Option<String>,
+    /// video fps
     #[structopt(short = "r", default_value = "2")]
     fps: f32,
+    /// two-pass video encoding
     #[structopt(long)]
     two_pass: Option<bool>,
-    // /// don't create archive w/ non-resized images if there any
-    // #[structopt(long)]
-    // noarchive: bool,
 }
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
@@ -86,7 +87,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Get most frequent width & hight from images (DirEntry) array
+/// Get most frequent width & hight from images
 fn get_video_dimm_from_images(images: &[PathBuf]) -> Option<(u32, u32)> {
     let mut images_w = Vec::<u32>::new();
     let mut images_h = Vec::<u32>::new();

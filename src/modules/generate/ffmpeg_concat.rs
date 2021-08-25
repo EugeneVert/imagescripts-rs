@@ -12,7 +12,7 @@ use crate::modules::utils;
 #[derive(StructOpt, Debug)]
 #[structopt(setting = AppSettings::ColoredHelp)]
 struct Opt {
-    /// input directory
+    /// input image paths
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
 }

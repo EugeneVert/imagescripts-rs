@@ -17,8 +17,10 @@ use crate::modules::utils;
 #[structopt(name = "imagescripts-rs find", about = " ")]
 #[structopt(setting = AppSettings::ColoredHelp, setting = AppSettings::AllowNegativeNumbers)]
 struct Opt {
+    /// input image paths
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
+    /// output directory path
     #[structopt(short, required = false, default_value = "./monochrome", display_order = 0)]
     out_dir: PathBuf,
     #[structopt(short, default_value = "0.1")]

@@ -20,10 +20,13 @@ struct Opt {
     /// ffmpeg arguments (or preset name {n} ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] )
     #[structopt(short, long = "ffmpeg", default_value = "x264")]
     ffmpeg_args: String,
-    #[structopt(long = "p:crf", default_value = "17")]
+    /// preset crf
+    #[structopt(long = "crf", default_value = "17")]
     preset_crf: f32,
+    /// video container
     #[structopt(short, long = "container")]
     container: Option<String>,
+    /// 
     #[structopt(long)]
     two_pass: Option<bool>,
 }

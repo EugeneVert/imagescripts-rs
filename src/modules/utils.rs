@@ -34,7 +34,7 @@ pub fn mkdir(dir: &std::path::Path) -> Result<(), std::string::String> {
     Ok(())
 }
 
-/// Gather image-files from cwd, remove 1'st element from input Vec
+/// Gather image files from cwd, remove 1'st element from input Vec
 ///
 /// # Examples
 /// ```

@@ -19,6 +19,7 @@ type BytesIO = Vec<u8>;
 #[structopt(name = "imagescripts-rs", about = " ")]
 #[structopt(setting = AppSettings::ColoredHelp)]
 struct Opt {
+    /// input image paths
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
     #[structopt(short, takes_value = true, default_value = "./out")]
@@ -29,14 +30,19 @@ struct Opt {
     /// "{encoder}>:{decoder}>:{extension}>:{output_from_stdout [0;1]}:>{args}"
     #[structopt(short, required = true)]
     cmds: Vec<String>,
+    /// percentage tolerance of commands to following ones
     #[structopt(short, long, default_value = "10")]
     tolerance: u32,
+    /// save encoded images
     #[structopt(long = "save")]
     save_all: bool,
+    /// save information to csv table
     #[structopt(long = "csv")]
     save_csv: bool,
+    /// path for csv table
     #[structopt(long = "csv_path", default_value = "./res.csv")]
     csv_path: PathBuf,
+    /// calculate the metrics of the encoded image to the original
     #[structopt(long = "metrics")]
     do_metrics: bool,
     #[structopt(long, default_value = "0")]
@@ -116,7 +122,7 @@ fn process_image(
         .collect();
 
     let mut res_filesize: u32 = 0;
-    let mut res_buff = ImageBuffer::new();
+    let mut res_buff = &ImageBuffer::new();
 
     // csv | open writer, push orig image filename&size
     let save_csv = opt.save_csv;
@@ -200,12 +206,12 @@ fn process_image(
         }
 
         let tolerance = opt.tolerance as f64; // %
-                                              // Commands has value tolerance over next ones
+                                              // Commands have a percentage tolerance to the following ones
         if (res_filesize == 0
             || (buff_filesize as f64) < (res_filesize as f64) * (1.0 - tolerance * 0.01))
             && buff_filesize != 0
         {
-            res_buff = buff.clone();
+            res_buff = buff;
             res_filesize = buff_filesize;
         }
     }

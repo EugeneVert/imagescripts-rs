@@ -14,12 +14,15 @@ use crate::modules::utils;
 #[structopt(name = "imagescripts-rs find", about = " ")]
 #[structopt(setting = AppSettings::ColoredHelp)]
 struct Opt {
+    /// input image paths
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
-    #[structopt(short, conflicts_with = "bigger")]
+    /// sort images w/ bpp greater than the target
+    #[structopt(short, conflicts_with = "greater")]
     lesser: Option<f32>,
+    /// sort images w/ bpp less than the target
     #[structopt(short, conflicts_with = "lesser")]
-    bigger: Option<f32>,
+    greater: Option<f32>,
     /// Custom metric: bpp + px_count / 2048^2
     #[structopt(short = "m")]
     custom_metric: bool,
@@ -32,7 +35,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     //     args = std::env::args_os().collect();
     // }
     let opt = Opt::from_iter(args);
-    let out_dir = std::path::PathBuf::from(unwrap_two(opt.lesser, opt.bigger).to_string());
+    let out_dir = std::path::PathBuf::from(unwrap_two(opt.lesser, opt.greater).to_string());
     let mut images = opt.input.to_owned();
     utils::ims_init(&mut images, &out_dir, Some(opt.nproc))?;
 
@@ -73,7 +76,7 @@ fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(),
             }
         }
         None => {
-            let val = opt.bigger.unwrap();
+            let val = opt.greater.unwrap();
             if img_metric > val {
                 save_flag = true;
             }

@@ -15,14 +15,19 @@ use crate::modules::utils;
 #[structopt(name = "imagescripts-rs find", about = " ")]
 #[structopt(setting = AppSettings::ColoredHelp)]
 struct Opt {
+    /// input image paths
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
+    /// search target
     #[structopt(short = "s", long = "size", required = false, default_value = "3508", display_order = 0)]
     px_size: u32,
+    /// sort png files to the "PNG" folder
     #[structopt(long = "p")]
     png_sort: bool,
+    /// keep empty folder after sorting
     #[structopt(long)]
     keep_empty: bool,
+    /// search target for png if png_sort is enabled
     #[structopt(long = "p:s", default_value="1754")]
     png_px_size: u32,
     #[structopt(long, default_value = "0")]
