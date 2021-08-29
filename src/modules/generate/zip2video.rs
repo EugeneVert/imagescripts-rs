@@ -11,7 +11,7 @@ use structopt::StructOpt;
 use crate::modules::utils;
 
 #[derive(StructOpt, Debug)]
-#[structopt(setting = AppSettings::ColoredHelp)]
+#[structopt(setting = AppSettings::ColoredHelp, setting = AppSettings::AllowLeadingHyphen)]
 struct Opt {
     /// input zip archive
     #[structopt(display_order = 0)]

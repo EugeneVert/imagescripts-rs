@@ -70,7 +70,7 @@ pub fn input_filter_images(input: &mut Vec<PathBuf>) {
     });
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct VideoOpts {
     args: String,
     pub container: Option<String>,
@@ -88,7 +88,7 @@ impl VideoOpts {
         }
     }
 
-    /// Returns preset args for ffmpeg if 'args' is preset name. Else returns 'args'
+    /// Match preset for ffmpeg if 'args' is preset name.
     /// If container is "", assigns preset_container to container
     // TODO toml config
     pub fn args_match(&mut self) {
@@ -137,7 +137,7 @@ impl VideoOpts {
         if self.two_pass.is_none() {
             self.two_pass = Some(preset_two_pass);
         }
-        self.ffmpeg_args = ffmpegargs.into();
+        self.ffmpeg_args = ffmpegargs.to_string();
     }
 
     pub fn presets_list() -> Vec<&'static str> {

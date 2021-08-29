@@ -13,7 +13,7 @@ use structopt::StructOpt;
 use crate::modules::utils;
 
 #[derive(StructOpt, Debug)]
-#[structopt(setting = AppSettings::ColoredHelp)]
+#[structopt(setting = AppSettings::ColoredHelp, setting = AppSettings::AllowLeadingHyphen)]
 struct Opt {
     /// input image paths
     #[structopt(required = false, default_value = "./*", display_order = 0)]
