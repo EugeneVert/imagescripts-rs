@@ -29,9 +29,9 @@ struct Opt {
     /// ffmpeg arguments (or preset name {n} ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] )
     #[structopt(short, long = "ffmpeg", default_value = "x264")]
     ffmpeg_args: String,
-    /// preset crf
-    #[structopt(long = "crf", default_value = "17")]
-    preset_crf: f32,
+    /// crf / qscale for preset
+    #[structopt(short = "q", default_value = "17")]
+    preset_quality: f32,
     /// video container
     #[structopt(short, long = "container")]
     container: Option<String>,
@@ -57,9 +57,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
     let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, &opt.container, &opt.two_pass);
     videoopts.args_match();
-    if videoopts.args_ispreset() {
-        videoopts.ffmpeg_args += format!(" -crf {}", &opt.preset_crf).as_str();
-    }
+    videoopts.args_preset_add_quality(opt.preset_quality);
 
     let demuxerf_path = Path::new("./concat_demuxer");
     utils::ffmpeg_demuxer_create_from_files(demuxerf_path, &images)?;

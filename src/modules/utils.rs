@@ -110,6 +110,11 @@ impl VideoOpts {
                 preset_two_pass = false;
                 "-c:v apng"
             }
+            "webp" => {
+                preset_container = "webp";
+                preset_two_pass = false;
+                "-c:v libwebp_anim"
+            }
             "vp9" => {
                 preset_container = "webm";
                 preset_two_pass = true;
@@ -141,12 +146,35 @@ impl VideoOpts {
     }
 
     pub fn presets_list() -> Vec<&'static str> {
-        vec!["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"]
+        vec![
+            "x264",
+            "x265",
+            "apng",
+            "webp",
+            "vp9",
+            "aom-av1",
+            "aom-av1-simple",
+        ]
     }
 
     pub fn args_ispreset(&self) -> bool {
         let presets = Self::presets_list();
         presets.contains(&self.args.as_str())
+    }
+
+    pub fn args_preset_add_quality(&mut self, q: f32) {
+        if !self.args_ispreset() {
+            return;
+        }
+        println!("{:?}", &self.args);
+        match self.args.as_ref() {
+            "x264" | "x265" | "vp9" | "aom-av1" | "aom-av1-simple" => {
+                self.ffmpeg_args += &format!(" -crf {}", &q)
+            }
+            "webp" => self.ffmpeg_args += &format!(" -qscale {}", &q),
+            _ => panic!(),
+        }
+        self.args += &format!("-crf {}", &q);
     }
 }
 
