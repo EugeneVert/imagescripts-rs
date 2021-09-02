@@ -76,7 +76,7 @@ fn process_image(img: &Path, paths: &Paths, opt: &Opt) -> Result<(), Box<dyn Err
     let save_path: Option<PathBuf>;
     println!("File: {}\nSize: {:?}", img.display(), img_dimmensions);
 
-    if opt.png_sort && img.ends_with(".png") {
+    if opt.png_sort && img.extension().unwrap_or_default().to_string_lossy() == "png" {
         if img_dimmensions.0 > opt.png_px_size || img_dimmensions.1 > opt.png_px_size {
             save_path = Some(paths.out_dir_png_size.join(img_filename));
         } else {
