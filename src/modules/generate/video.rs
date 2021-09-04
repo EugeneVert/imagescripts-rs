@@ -91,7 +91,10 @@ fn get_video_dimm_from_images(images: &[PathBuf]) -> Option<(u32, u32)> {
     let mut images_h = Vec::<u32>::new();
     images
         .iter()
-        .map(|i| image::image_dimensions(i).unwrap())
+        .map(|i| {
+            image::image_dimensions(i)
+                .unwrap_or_else(|e| panic!("Can't read image dimensions: {}; {}", &i.display(), &e))
+        })
         .for_each(|d| {
             images_w.push(d.0);
             images_h.push(d.1);

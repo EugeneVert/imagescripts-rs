@@ -172,7 +172,7 @@ impl VideoOpts {
                 self.ffmpeg_args += &format!(" -crf {}", &q)
             }
             "webp" => self.ffmpeg_args += &format!(" -qscale {}", &q),
-            _ => panic!(),
+            _ => (),
         }
         self.args += &format!("-crf {}", &q);
     }
