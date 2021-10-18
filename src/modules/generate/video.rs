@@ -53,7 +53,14 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         images.sort_unstable()
     }
 
-    let dimm = get_video_dimm_from_images(&images).expect("Can't calculate frequent image dimms");
+    let dimm = opt.dimensions.and_then(|s| {
+        s.split_once('x')
+            .map(|s| (s.0.parse().unwrap(), s.1.parse().unwrap()))
+    });
+    let dimm = match dimm {
+        Some(x) => x,
+        None => get_video_dimm_from_images(&images).expect("Can't calculate frequent image dimms"),
+    };
 
     let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, &opt.container, &opt.two_pass);
     videoopts.args_match();
@@ -102,9 +109,20 @@ fn get_video_dimm_from_images(images: &[PathBuf]) -> Option<(u32, u32)> {
     let freq_w = most_frequent(&images_w);
     let freq_h = most_frequent(&images_h);
     println!("{:?}", (freq_w, freq_h));
-    match (freq_w, freq_h) {
-        (Some(w), Some(h)) => Some((w, h)),
-        _ => None,
+
+    if let (Some(w), Some(h)) = (freq_w, freq_h) {
+        // find and print image paths whose sizes differs from the most frequent ones
+        images_w
+            .iter()
+            .zip(&freq_h)
+            .enumerate()
+            .filter(|x| x.1 != (&w, &h))
+            .map(|x| &images[x.0])
+            .for_each(|f| println!("Image {} will be resized", f.display()));
+
+        Some((w, h))
+    } else {
+        None
     }
 }
 
