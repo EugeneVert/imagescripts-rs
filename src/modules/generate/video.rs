@@ -19,7 +19,7 @@ struct Opt {
     #[structopt(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
 
-    /// video dimensions
+    /// video dimensions (e.g: '128x128')
     #[structopt(short = "d")]
     dimensions: Option<String>,
     /// video background for resized images
@@ -36,7 +36,7 @@ struct Opt {
     #[structopt(short, long = "container")]
     container: Option<String>,
     /// video fps
-    #[structopt(short = "r", default_value = "2")]
+    #[structopt(short = "r", default_value = "4")]
     fps: f32,
     /// two-pass video encoding
     #[structopt(long)]
