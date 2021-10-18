@@ -25,7 +25,7 @@ struct Opt {
     #[structopt(short, takes_value = true, default_value = "./out")]
     out_dir: PathBuf,
     /// avaible presets:    {n}
-    /// "cjxl:{args}", "avif:{args}", "jpeg:{args}", "cwebp:{args}"   {n}
+    /// "cjxl:{args}", "avif:{args}", "jpeg:{args}", "cwebp:{args}", png:{} {n}
     /// custom cmd format:  {n}
     /// "{encoder}>:{decoder}>:{extension}>:{output_from_stdout [0;1]}:>{args}"
     #[structopt(short, required = true)]
@@ -254,6 +254,7 @@ impl ImageMetricsOptions {
             ssimulacra: false,
         }
     }
+
     /// Checks the metrics avaibility in path and sets the corresponding struct field to `true`
     /// # Returns
     /// `1` if any metric is avaible
@@ -266,6 +267,7 @@ impl ImageMetricsOptions {
         }
         self.list_avaible().len().ne(&0)
     }
+
     /// returns a vec of avaible metrics
     fn list_avaible(&self) -> Vec<String> {
         let mut m: Vec<String> = Vec::new();
@@ -278,6 +280,7 @@ impl ImageMetricsOptions {
         }
         m
     }
+
     fn butteraugli_run(
         &self,
         original: &str,
@@ -295,6 +298,7 @@ impl ImageMetricsOptions {
             .map(|l| l.unwrap_or_else(|_| "-".into()))
             .collect())
     }
+    
     fn ssimulacra_run(&self, original: &str, distorted: &str) -> Result<String, Box<dyn Error>> {
         let outp = std::process::Command::new("ssimulacra_main")
             .arg(original)
@@ -371,6 +375,12 @@ impl ImageBuffer {
                 self.cmd_enc = "cjpeg".into();
                 self.cmd_dec = "djpeg".into();
                 self.cmd_enc_output_from_stdout = true;
+            }
+            // TODO use image crate to convert into png
+            "png" => {
+                self.ext = "png".into();
+                self.cmd_enc = "convert".into();
+                self.cmd_dec = "convert".into();
             }
             "cjxl" => {
                 self.ext = "jxl".into();
