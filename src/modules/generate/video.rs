@@ -106,24 +106,21 @@ fn get_video_dimm_from_images(images: &[PathBuf]) -> Option<(u32, u32)> {
             images_w.push(d.0);
             images_h.push(d.1);
         });
-    let freq_w = most_frequent(&images_w);
-    let freq_h = most_frequent(&images_h);
-    println!("{:?}", (freq_w, freq_h));
+    let w = most_frequent(&images_w)?;
+    let h = most_frequent(&images_h)?;
+    println!("{:?}x{:?}", &w, &h);
 
-    if let (Some(w), Some(h)) = (freq_w, freq_h) {
-        // find and print image paths whose sizes differs from the most frequent ones
-        images_w
-            .iter()
-            .zip(&freq_h)
-            .enumerate()
-            .filter(|x| x.1 != (&w, &h))
-            .map(|x| &images[x.0])
-            .for_each(|f| println!("Image {} will be resized", f.display()));
+    // find and print image paths whose sizes differs from the most frequent ones
+    images_w
+        .iter()
+        .zip(&images_h)
+        // .for_each(|x| println!("{:?}", &x));
+        .enumerate()
+        .filter(|x| x.1 != (&w, &h))
+        .map(|x| &images[x.0])
+        .for_each(|f| println!("Image {} will be resized", f.display()));
 
-        Some((w, h))
-    } else {
-        None
-    }
+    Some((w, h))
 }
 
 fn most_frequent<T>(iter: &[T]) -> Option<T>
