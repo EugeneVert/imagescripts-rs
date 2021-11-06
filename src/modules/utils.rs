@@ -195,10 +195,7 @@ fn ffmpeg_cmd_run(ffmpeg_cmd: &str) {
     println!("{:?}", ffmpeg_cmd);
     std::process::Command::new("ffmpeg")
         .args(ffmpeg_cmd.split(' '))
-        .stdin(std::process::Stdio::inherit())
-        .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::inherit())
-        .output()
+        .status()
         .unwrap();
 }
 

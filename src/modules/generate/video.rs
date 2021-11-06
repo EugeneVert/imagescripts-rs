@@ -135,10 +135,7 @@ fn generate_thumbnail(
         .arg("-vsync")
         .arg("0")
         .arg(format!("{}/capture%002d.png", &tmpdir.path().display()))
-        .stdin(std::process::Stdio::inherit())
-        .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::inherit())
-        .output()?;
+        .status()?;
 
     const MONTAGE_ARGS_2X2: [&str; 6] = [
         "-geometry",
@@ -156,10 +153,7 @@ fn generate_thumbnail(
             &tmpdir.path().read_dir().unwrap().count()
         ))
         .arg(format!("{}.jxl", &video_filename))
-        .stdin(std::process::Stdio::inherit())
-        .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::inherit())
-        .output()?;
+        .status()?;
     tmpdir.close()?;
 
     Ok(())
