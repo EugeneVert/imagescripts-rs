@@ -1,5 +1,3 @@
-// TODO: piping input file list, dry run;
-
 use std::{
     error::Error,
     ffi::{OsStr, OsString},
@@ -60,7 +58,6 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let mut opt_metrics = ImageMetricsOptions::new();
     if opt.do_metrics && opt_metrics.check_availability() {
         opt_metrics.do_metrics = true;
-        opt_metrics.check_availability();
         let metrics = opt_metrics.list_avaible();
         println!("Metrics: {:?}", &metrics);
     }
@@ -116,7 +113,8 @@ fn process_image(
         .par_iter()
         .map(|cmd| {
             let mut buff = ImageBuffer::new();
-            buff.image_generate(img, cmd).unwrap();
+            buff.image_generate(img, cmd)
+                .unwrap_or_else(|e| eprintln!("Can't process {}: {}", &cmd, &e));
             buff
         })
         .collect();
@@ -257,15 +255,19 @@ impl ImageMetricsOptions {
 
     /// Checks the metrics avaibility in path and sets the corresponding struct field to `true`
     /// # Returns
-    /// `1` if any metric is avaible
+    /// `true` if any metric is avaible
     fn check_availability(&mut self) -> bool {
         if is_program_in_path("butteraugli_main") {
             self.butteraugli = true;
+        } else {
+            println!("No butteraugli_main in PATH")
         }
         if is_program_in_path("ssimulacra_main") {
             self.ssimulacra = true;
+        } else {
+            println!("No ssimulacra_main in PATH")
         }
-        self.list_avaible().len().ne(&0)
+        (self.butteraugli | self.ssimulacra) != true
     }
 
     /// returns a vec of avaible metrics
@@ -298,7 +300,7 @@ impl ImageMetricsOptions {
             .map(|l| l.unwrap_or_else(|_| "-".into()))
             .collect())
     }
-    
+
     fn ssimulacra_run(&self, original: &str, distorted: &str) -> Result<String, Box<dyn Error>> {
         let outp = std::process::Command::new("ssimulacra_main")
             .arg(original)
@@ -436,6 +438,7 @@ impl ImageBuffer {
         if self.cmd_enc_args.contains(&"".into()) {
             self.cmd_enc_args.pop();
         }
+
         if self.cmd_enc_output_from_stdout {
             let output = std::process::Command::new(&self.cmd_enc)
                 .args(&self.cmd_enc_args)
@@ -479,8 +482,8 @@ fn command_print_if_error(output: &std::process::Output) -> Result<(), String> {
     if output.status.success() {
         Ok(())
     } else {
-        println!("{}", std::str::from_utf8(&output.stderr).unwrap());
-        println!("{}", std::str::from_utf8(&output.stdout).unwrap());
+        let o = [&output.stderr, "\n".as_bytes(), &output.stdout].concat();
+        println!("{}", std::str::from_utf8(&o).unwrap());
         Err("Command returned error status".into())
     }
 }
