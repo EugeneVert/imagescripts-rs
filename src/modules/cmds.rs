@@ -125,6 +125,7 @@ fn process_image(
     // csv | open writer, push orig image filename&size
     let save_csv = opt.save_csv;
     let mut csv_row = Vec::<String>::new();
+
     let mut csv_writer = if save_csv {
         let csv_file = std::fs::OpenOptions::new()
             .write(true)
@@ -155,6 +156,7 @@ fn process_image(
             &buff.ex_time.as_secs_f32(),
             percentage_of_original
         );
+
         if opt_metrics.do_metrics {
             let img_wa = image_remove_alpha(img)?;
             let img_wa_path = img_wa.path().to_str().unwrap().to_string();
@@ -199,15 +201,16 @@ fn process_image(
                 &buff.ext
             ));
             let mut f = std::fs::File::create(save_path)?;
-            f.write_all(&buff.image[..])?;
+            f.write_all(&buff.image)?;
             continue;
         }
 
+        // Commands have a percentage tolerance to the following ones
         let tolerance = opt.tolerance as f64; // %
-                                              // Commands have a percentage tolerance to the following ones
-        if (res_filesize == 0
-            || (buff_filesize as f64) < (res_filesize as f64) * (1.0 - tolerance * 0.01))
-            && buff_filesize != 0
+
+        if res_filesize == 0
+            || buff_filesize != 0
+                && (buff_filesize as f64) < (res_filesize as f64) * (1.0 - tolerance * 0.01)
         {
             res_buff = buff;
             res_filesize = buff_filesize;
@@ -232,7 +235,7 @@ fn process_image(
         &res_buff.ext
     ));
     let mut f = std::fs::File::create(save_path)?;
-    f.write_all(&res_buff.image[..])?;
+    f.write_all(&res_buff.image)?;
 
     Ok(())
 }
@@ -267,7 +270,7 @@ impl ImageMetricsOptions {
         } else {
             println!("No ssimulacra_main in PATH")
         }
-        (self.butteraugli | self.ssimulacra) != true
+        !(self.butteraugli | self.ssimulacra)
     }
 
     /// returns a vec of avaible metrics
