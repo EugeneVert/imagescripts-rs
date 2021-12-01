@@ -17,7 +17,7 @@ struct Opt {
     #[structopt(display_order = 0)]
     input: PathBuf,
 
-    /// ffmpeg arguments (or preset name {n} ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] )
+    /// ffmpeg arguments (or preset name {n} ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] ) {n}
     #[structopt(short, long = "ffmpeg", default_value = "x264")]
     ffmpeg_args: String,
     /// crf / qscale for preset
@@ -26,7 +26,7 @@ struct Opt {
     /// video container
     #[structopt(short, long = "container")]
     container: Option<String>,
-    /// 
+    ///
     #[structopt(long)]
     two_pass: Option<bool>,
 }

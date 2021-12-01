@@ -189,7 +189,8 @@ fn get_video_dimm_from_images(images: &[PathBuf]) -> Option<(u32, u32)> {
             println!("Image {} will be resized", f.display());
             f
         })
-        .count() != 0;
+        .count()
+        != 0;
     if be_resized {
         println!("Please press 'Enter'");
         std::io::stdin().read_line(&mut String::new()).unwrap();
