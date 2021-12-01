@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     ffi::{OsStr, OsString},
-    io::{BufRead, Write},
+    io::{BufRead, Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -28,10 +28,11 @@ struct Opt {
     /// "{encoder}>:{decoder}>:{extension}>:{output_from_stdout [0;1]}:>{args}"
     #[structopt(short, required = true)]
     cmds: Vec<String>,
-    /// percentage tolerance of commands to following ones
+    /// percentage tolerance of commands to the following ones{n}
+    /// (cmd res. filesize to orig. filesize precentage){n} (when not saving all results)
     #[structopt(short, long, default_value = "10")]
     tolerance: u32,
-    /// save encoded images
+    /// save all encoded images (Not only the best compressed one)
     #[structopt(long = "save")]
     save_all: bool,
     /// save information to csv table
@@ -113,8 +114,13 @@ fn process_image(
         .par_iter()
         .map(|cmd| {
             let mut buff = ImageBuffer::new();
-            buff.image_generate(img, cmd)
-                .unwrap_or_else(|e| eprintln!("Can't process {}: {}", &cmd, &e));
+            buff.image_generate(img, cmd).unwrap_or_else(|e| {
+                // TODO match Result<Vec<_>>
+                eprintln!("Can't process {}: {}", &cmd, &e);
+                if !confirm_prompt("Continue?") {
+                    std::process::exit(1);
+                }
+            });
             buff
         })
         .collect();
@@ -148,22 +154,26 @@ fn process_image(
         let buff_bpp = (buff_filesize * 8) as f64 / px_count as f64;
         let percentage_of_original = format!("{:.2}", (100 * buff_filesize / img_filesize));
         let mut printing_status = format!(
-            "{}\n{} --> {}\t{:6.2}bpp\t{:>6.2}s \t{}%\n",
+            "{}\n{} --> {}\t{:6.2}bpp\t{}%\t{:>6.2}s",
             &buff.get_cmd(),
             byte2size(img_filesize as u64),
             byte2size(buff_filesize as u64),
             &buff_bpp,
+            percentage_of_original,
             &buff.ex_time.as_secs_f32(),
-            percentage_of_original
         );
 
         if opt_metrics.do_metrics {
+            // remova alpha from source and distorted images
+            // FIXME sometimes doesn't gives ?lossy? results
             let img_wa = image_remove_alpha(img)?;
             let img_wa_path = img_wa.path().to_str().unwrap().to_string();
             let img_distorted = buff.image_decode()?;
             let img_distorted_wa = image_remove_alpha(img_distorted.path())?;
             let img_distorted_path = img_distorted_wa.path().to_str().unwrap().to_string();
             img_distorted.close()?;
+
+            // do metrics
             if opt_metrics.butteraugli {
                 let m = opt_metrics.butteraugli_run(&img_wa_path, &img_distorted_path)?;
                 let butteraugli_max_norm = &m[0];
@@ -189,6 +199,7 @@ fn process_image(
         }
 
         if opt.save_all {
+            // save each buffer to save_path
             if buff_filesize == 0 {
                 continue;
             }
@@ -205,12 +216,14 @@ fn process_image(
             continue;
         }
 
-        // Commands have a percentage tolerance to the following ones
+        // difference between the res_buf and current buf
+        // to orig file percentages must be greater than the tolerance
         let tolerance = opt.tolerance as f64; // %
 
         if res_filesize == 0
             || buff_filesize != 0
-                && (buff_filesize as f64) < (res_filesize as f64) * (1.0 - tolerance * 0.01)
+                && (res_filesize as f64 - buff_filesize as f64)
+                    > img_filesize as f64 * tolerance * 0.01
         {
             res_buff = buff;
             res_filesize = buff_filesize;
@@ -226,7 +239,7 @@ fn process_image(
     if opt.save_all {
         return Ok(());
     }
-    // save res
+    // save res_buf
     let save_path = out_dir.join(format!(
         "{}.{}",
         img.file_stem()
@@ -236,6 +249,7 @@ fn process_image(
     ));
     let mut f = std::fs::File::create(save_path)?;
     f.write_all(&res_buff.image)?;
+    println!("save {}\n", &res_buff.cmd);
 
     Ok(())
 }
@@ -319,8 +333,9 @@ impl ImageMetricsOptions {
 }
 
 #[derive(Debug, Clone)]
-struct ImageBuffer {
+struct ImageBuffer<'a> {
     image: BytesIO,
+    cmd: &'a str,
     cmd_enc: String,
     cmd_enc_args: Vec<String>,
     cmd_enc_output_from_stdout: bool,
@@ -330,10 +345,11 @@ struct ImageBuffer {
     ex_time: core::time::Duration,
 }
 
-impl ImageBuffer {
-    fn new() -> ImageBuffer {
+impl<'a> ImageBuffer<'a> {
+    fn new() -> ImageBuffer<'static> {
         ImageBuffer {
             image: Vec::new(),
+            cmd: "",
             cmd_enc: String::new(),
             cmd_enc_args: Vec::new(),
             cmd_enc_output_from_stdout: false,
@@ -352,7 +368,8 @@ impl ImageBuffer {
         self.cmd_enc.to_string() + " " + &self.cmd_enc_args.join(" ")
     }
 
-    fn image_generate(&mut self, img_path: &Path, cmd: &str) -> Result<(), Box<dyn Error>> {
+    fn image_generate(&mut self, img_path: &Path, cmd: &'a str) -> Result<(), Box<dyn Error>> {
+        self.cmd = &cmd;
         let cmd_args: Vec<String> = cmd.split(">:").map(|s| s.to_owned()).collect();
         let time_start = std::time::Instant::now();
 
@@ -466,6 +483,7 @@ impl ImageBuffer {
     }
 }
 
+/// remove alpha from image using ImageMagick convert
 fn image_remove_alpha(img: &Path) -> Result<tempfile::NamedTempFile, Box<dyn Error>> {
     let tf = tempfile::Builder::new().suffix(".png").tempfile()?;
     // TODO find a way to do alpha-removal w/o ImageMagick
@@ -489,6 +507,19 @@ fn command_print_if_error(output: &std::process::Output) -> Result<(), String> {
         println!("{}", std::str::from_utf8(&o).unwrap());
         Err("Command returned error status".into())
     }
+}
+
+// TODO
+fn confirm_prompt(text: &str) -> bool {
+    println!("{} [Y/n] ", text);
+    let mut i = [0];
+    std::io::stdin().lock().read_exact(&mut i).unwrap();
+    println!("{:?}", &i);
+    println!("{:?}", String::from_utf8_lossy(&i));
+    if String::from_utf8_lossy(&i) == "y" {
+        return true;
+    }
+    false
 }
 
 fn byte2size(num: u64) -> String {
