@@ -1,8 +1,8 @@
-# `Imagescripts-rs` (temporary name)
+# `Imagescripts-rs`
 
 A collection of modules for image gallery manipulations, such as: creating animations and slideshows from images in `.zip` archives or in folder respectively; comparing image encoding commands (e.g. `cjxl` for _jpeg xl_ or `avifenc` for _avif_) (by size, metrics and time); finding images with desired bpp (bits per pixel), monochrome images, or images with specified dimmensions.
 
-- [`Imagescripts-rs` (temporary name)](#imagescripts-rs-temporary-name)
+- [`Imagescripts-rs`](#imagescripts-rs)
 - [Features](#features)
   - ['Finding' images (`find`)](#finding-images-find)
     - [Find images with desired bpp (`bpp`)](#find-images-with-desired-bpp-bpp)
@@ -21,7 +21,7 @@ A collection of modules for image gallery manipulations, such as: creating anima
 
 ### Find images with desired bpp (`bpp`)
 
-Find images that have a bpp value less than or greater than the target value. There is also a custom metric behind the `-m` switch: `bpp + px_count / 2048^2`
+Find images that have a bpp value less/greater than the target value. There is also a custom metric behind the `-m` switch: `bpp + px_count / 2048^2`
 
 **Example**
 
@@ -31,7 +31,7 @@ ims-rs find bpp -m -l 3.5
 
 ### Find Monochrome images (`monochrome`)
 
-Checks if the image has color and, if so, computes Mean Squared Error (x100) from mean hue bias by converting each pixel of the thumbnailed image to hsv
+Checks if the image is monochrome by computing Mean Squared Error (x100) from mean hue bias by converting each pixel of the thumbnailed image to hsv
 
 **Example**
 
