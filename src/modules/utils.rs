@@ -122,12 +122,12 @@ impl VideoOpts {
             }
             "aom-av1" => {
                 preset_container = "mkv";
-                preset_two_pass = true;
-                "-c:v libaom-av1 -pix_fmt yuv444p10le -b:v 0 -cpu-used 4 -tile-rows 2 -strict -2 -aom-params enable-chroma-deltaq=1"
+                preset_two_pass = false;
+                "-c:v libaom-av1 -pix_fmt yuv444p10le -cpu-used 4 -tile-rows 2 -strict -2 -aq-mode 1 -aom-params enable-chroma-deltaq=1:deltaq-mode=3:qm-min=0:sharpness=2"
             }
             "aom-av1-simple" => {
                 preset_container = "mkv";
-                preset_two_pass = true;
+                preset_two_pass = false;
                 "-c:v libaom-av1 -pix_fmt yuv444p10le -b:v 0 -cpu-used 4 -tile-rows 2 -strict -2"
             }
             _ => {
