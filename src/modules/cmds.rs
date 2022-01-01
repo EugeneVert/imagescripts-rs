@@ -6,43 +6,40 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::AppSettings;
+use clap::Parser;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use structopt::StructOpt;
 
 use crate::modules::utils;
 
 type BytesIO = Vec<u8>;
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "imagescripts-rs", about = " ")]
-#[structopt(setting = AppSettings::ColoredHelp)]
+#[derive(Parser, Debug)]
 struct Opt {
     /// input image paths
-    #[structopt(required = false, default_value = "./*", display_order = 0)]
+    #[clap(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
-    #[structopt(short, takes_value = true, default_value = "./out")]
+    #[clap(short, takes_value = true, default_value = "./out")]
     out_dir: PathBuf,
     /// avaible presets:    {n}
     /// "cjxl:{args}", "avif:{args}", "jpeg:{args}", "cwebp:{args}", png:{} {n}
     /// custom cmd format:  {n}
     /// "{encoder}>:{decoder}>:{extension}>:{output_from_stdout [0;1]}:>{args}"
-    #[structopt(short, required = true)]
+    #[clap(short, required = true)]
     cmds: Vec<String>,
     /// percentage tolerance of commands to the following ones{n}
     /// (cmd res. filesize to orig. filesize precentage){n} (when not saving all results)
-    #[structopt(short, long, default_value = "10")]
+    #[clap(short, long, default_value = "10")]
     tolerance: u32,
     /// save all encoded images (Not only the best compressed one)
-    #[structopt(long = "save")]
+    #[clap(long = "save")]
     save_all: bool,
     /// save information to csv table
-    #[structopt(long = "csv")]
+    #[clap(long = "csv")]
     save_csv: bool,
     /// path for csv table
-    #[structopt(long = "csv_path", default_value = "./res.csv")]
+    #[clap(long = "csv_path", default_value = "./res.csv")]
     csv_path: PathBuf,
-    #[structopt(long, default_value = "0")]
+    #[clap(long, default_value = "0")]
     nproc: usize,
 }
 
@@ -50,7 +47,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     // if args.is_empty() {
     //     args = std::env::args_os().collect();
     // }
-    let opt = Opt::from_iter(args);
+    let opt = Opt::parse_from(args);
 
     let csv_path = &opt.csv_path;
 
@@ -322,12 +319,15 @@ impl<'a> ImageBuffer<'a> {
         &mut self,
         img_path: &Path,
         cmd_args: &[String],
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    ) -> std::io::Result<()> {
         self.cmd_enc_args = cmd_args[4].split(' ').map(|s| s.to_owned()).collect();
         self.ext = cmd_args[0].to_string();
         self.cmd_enc = cmd_args[1].to_string();
         self.cmd_dec = cmd_args[2].to_string();
-        self.cmd_enc_output_from_stdout = cmd_args[3].parse::<u8>()?.ne(&0);
+        self.cmd_enc_output_from_stdout = cmd_args[3]
+            .parse::<u8>()
+            .expect("wrong 'output_from_stdout' flag")
+            .ne(&0);
         self.gen_from_cmd(img_path)?;
         Ok(())
     }
@@ -345,7 +345,7 @@ impl<'a> ImageBuffer<'a> {
     //     Ok(tf_out)
     // }
 
-    fn gen_from_cmd(&mut self, img_path: &Path) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn gen_from_cmd(&mut self, img_path: &Path) -> std::io::Result<()> {
         // no arguments -> return None
         if self.cmd_enc_args.contains(&"".into()) {
             self.cmd_enc_args.pop();
@@ -375,13 +375,16 @@ impl<'a> ImageBuffer<'a> {
     }
 }
 
-fn command_print_if_error(output: &std::process::Output) -> Result<(), String> {
+fn command_print_if_error(output: &std::process::Output) -> std::io::Result<()> {
     if output.status.success() {
         Ok(())
     } else {
         let o = [&output.stderr, "\n".as_bytes(), &output.stdout].concat();
         println!("{}", std::str::from_utf8(&o).unwrap());
-        Err("Command returned error status".into())
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Command returned error status",
+        ))
     }
 }
 

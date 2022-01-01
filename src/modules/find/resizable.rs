@@ -4,38 +4,35 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::AppSettings;
+use clap::Parser;
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use structopt::StructOpt;
 
 use crate::modules::utils;
 
 #[rustfmt::skip]
-#[derive(StructOpt, Debug)]
-#[structopt(name = "imagescripts-rs find", about = " ")]
-#[structopt(setting = AppSettings::ColoredHelp)]
+#[derive(Parser, Debug)]
 struct Opt {
     /// input image paths
-    #[structopt(required = false, default_value = "./*", display_order = 0)]
+    #[clap(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
     /// search target
-    #[structopt(short = "s", long = "size", required = false, default_value = "3508", display_order = 0)]
+    #[clap(short = 's', long = "size", required = false, default_value = "3508", display_order = 0)]
     px_size: u32,
     /// sort png files to the "PNG" folder
-    #[structopt(long = "p")]
+    #[clap(long = "p")]
     png_sort: bool,
     /// keep empty folder after sorting
-    #[structopt(long)]
+    #[clap(long)]
     keep_empty: bool,
     /// search target for png if png_sort is enabled
-    #[structopt(long = "p:s", default_value="1754")]
+    #[clap(long = "p:s", default_value="1754")]
     png_px_size: u32,
-    #[structopt(long, default_value = "0")]
+    #[clap(long, default_value = "0")]
     nproc: usize,
 }
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
-    let opt = Opt::from_iter(args);
+    let opt = Opt::parse_from(args);
     let paths = Paths {
         out_dir: Path::new("./").join(opt.px_size.to_string()),
         out_dir_png: PathBuf::from("./PNG"),

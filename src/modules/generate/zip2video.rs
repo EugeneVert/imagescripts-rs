@@ -5,34 +5,33 @@ use std::{
     path::PathBuf,
 };
 
-use clap::AppSettings;
-use structopt::StructOpt;
+use clap::{AppSettings, Parser};
 
 use crate::modules::utils;
 
-#[derive(StructOpt, Debug)]
-#[structopt(setting = AppSettings::ColoredHelp, setting = AppSettings::AllowLeadingHyphen)]
+#[derive(Parser, Debug)]
+#[structopt(setting = AppSettings::AllowHyphenValues)]
 struct Opt {
     /// input zip archive
-    #[structopt(display_order = 0)]
+    #[clap(display_order = 0)]
     input: PathBuf,
 
     /// ffmpeg arguments (or preset name {n} ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] ) {n}
-    #[structopt(short, long = "ffmpeg", default_value = "x264")]
+    #[clap(short, long = "ffmpeg", default_value = "x264")]
     ffmpeg_args: String,
     /// crf / qscale for preset
-    #[structopt(short = "q", default_value = "17")]
+    #[clap(short = 'q', default_value = "17")]
     preset_quality: f32,
     /// video container
-    #[structopt(short, long = "container")]
+    #[clap(short, long = "container")]
     container: Option<String>,
     ///
-    #[structopt(long)]
+    #[clap(long)]
     two_pass: Option<bool>,
 }
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
-    let opt = Opt::from_iter(args);
+    let opt = Opt::parse_from(args);
 
     // extract zip to tempdir
     let zip_file = std::fs::File::open(&opt.input)?;
@@ -57,7 +56,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     utils::ffmpeg_demuxer_create_from_json(&demuxerf_path, &json_mux)?;
     let ffmpeg_cmd = format!(
         "-f concat -i {} {} \
-        -vf pad=ceil(iw/2)*2:ceil(ih/2)*2' ",
+        -vf pad=ceil(iw/2)*2:ceil(ih/2)*2'",
         &demuxerf_path.display(),
         &videoopts.ffmpeg_args,
     );

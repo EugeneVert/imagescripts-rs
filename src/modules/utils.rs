@@ -62,7 +62,7 @@ pub fn input_get_from_cwd(input: &mut Vec<PathBuf>) -> Result<(), std::io::Error
 }
 
 pub fn input_filter_images(input: &mut Vec<PathBuf>) {
-    let image_formats = ["png", "jpg", "webp"];
+    let image_formats = ["png", "jpg", "jxl", "avif", "webp"];
     input.retain(|i| {
         image_formats
             .iter()
@@ -179,24 +179,26 @@ impl VideoOpts {
 }
 
 pub fn ffmpeg_run(ffmpeg_cmd: &str, filestem: &str, two_pass: bool, container: &str) {
+    println!("{}", &ffmpeg_cmd);
     if two_pass {
-        let ffmpeg_cmd_pass1 = ffmpeg_cmd.to_owned() + "-pass 1 -an -f null /dev/null";
-        let ffmpeg_cmd_pass2 =
-            ffmpeg_cmd.to_owned() + "-pass 2 -hide_banner " + filestem + "." + container;
-        ffmpeg_cmd_run(&ffmpeg_cmd_pass1);
-        ffmpeg_cmd_run(&ffmpeg_cmd_pass2);
+        std::process::Command::new("ffmpeg")
+            .args(ffmpeg_cmd.split(' '))
+            .args("-pass 1 -an -f null /dev/null".split(' '))
+            .status()
+            .unwrap();
+        std::process::Command::new("ffmpeg")
+            .args(ffmpeg_cmd.split(' '))
+            .args("-pass 2 -hide_banner".split(' '))
+            .arg(format!("{}.{}", &filestem, &container))
+            .status()
+            .unwrap();
     } else {
-        let ffmpeg_cmd_once = ffmpeg_cmd.to_owned() + filestem + "." + container;
-        ffmpeg_cmd_run(&ffmpeg_cmd_once);
+        std::process::Command::new("ffmpeg")
+            .args(ffmpeg_cmd.split(' '))
+            .arg(format!("{}.{}", &filestem, &container))
+            .status()
+            .unwrap();
     }
-}
-
-fn ffmpeg_cmd_run(ffmpeg_cmd: &str) {
-    println!("{:?}", ffmpeg_cmd);
-    std::process::Command::new("ffmpeg")
-        .args(ffmpeg_cmd.split(' '))
-        .status()
-        .unwrap();
 }
 
 pub fn ffmpeg_demuxer_create_from_json<T>(

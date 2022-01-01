@@ -4,21 +4,19 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::AppSettings;
-use structopt::StructOpt;
+use clap::Parser;
 
 use crate::modules::utils;
 
-#[derive(StructOpt, Debug)]
-#[structopt(setting = AppSettings::ColoredHelp)]
+#[derive(Parser, Debug)]
 struct Opt {
     /// input image paths
-    #[structopt(required = false, default_value = "./*", display_order = 0)]
+    #[clap(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
 }
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
-    let opt = Opt::from_iter(args);
+    let opt = Opt::parse_from(args);
 
     let mut images = opt.input;
     if images[0].to_string_lossy() == "./*" {

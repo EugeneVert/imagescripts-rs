@@ -7,50 +7,52 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::AppSettings;
-use structopt::StructOpt;
+use clap::{AppSettings, Parser};
 
 use crate::modules::utils;
 
-#[derive(StructOpt, Debug)]
-#[structopt(setting = AppSettings::ColoredHelp, setting = AppSettings::AllowLeadingHyphen)]
+#[derive(Parser, Debug)]
+#[clap(setting = AppSettings::AllowHyphenValues)]
 struct Opt {
     /// input image paths
-    #[structopt(required = false, default_value = "./*", display_order = 0)]
+    #[clap(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
 
     /// video dimensions (e.g: '128x128')
-    #[structopt(short = "d")]
+    #[clap(short = 'd')]
     dimensions: Option<String>,
     /// video background for resized images
-    #[structopt(long = "bg", default_value = "Black")]
+    #[clap(long = "bg", default_value = "Black")]
     background: String,
 
     /// ffmpeg arguments (or preset name {n} ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] ) {n}
-    #[structopt(short, long = "ffmpeg", default_value = "x264")]
+    #[clap(short, long = "ffmpeg", default_value = "x264")]
     ffmpeg_args: String,
     /// crf / qscale for preset
-    #[structopt(short = "q", default_value = "17")]
+    #[clap(short = 'q', default_value = "17")]
     preset_quality: f32,
     /// video container
-    #[structopt(short, long = "container")]
+    #[clap(short, long = "container")]
     container: Option<String>,
     /// video fps
-    #[structopt(short = "r", default_value = "4")]
+    #[clap(short = 'r', default_value = "4")]
     fps: f32,
     /// two-pass video encoding
-    #[structopt(long)]
+    #[clap(long)]
     two_pass: Option<bool>,
     /// generate video thumbnail
-    #[structopt(short = "t", long = "thumb")]
+    #[clap(short = 't', long = "thumb")]
     create_thumbnail: bool,
     /// amount of 2x2 thumbnail sheets
-    #[structopt(short = "s", long = "thumb_sheets", default_value = "2")]
+    #[clap(short = 's', long = "thumb_sheets", default_value = "2")]
     thumbnail_sheets: usize,
+    /// Don't ask for resize confirmation
+    #[clap(short = 'n', long = "no_confirm")]
+    no_confirm: bool,
 }
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
-    let opt = Opt::from_iter(args);
+    let opt = Opt::parse_from(args);
 
     let mut images = opt.input.to_owned();
     if images[0].to_string_lossy() == "./*" {
@@ -65,7 +67,8 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     });
     let dimm = match dimm {
         Some(x) => x,
-        None => get_video_dimm_from_images(&images).expect("Can't calculate frequent image dimms"),
+        None => get_video_dimm_from_images(&images, opt.no_confirm)
+            .expect("Can't calculate frequent image dimms"),
     };
 
     let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, &opt.container, &opt.two_pass);
@@ -78,7 +81,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let ffmpeg_cmd = format!(
         "-r {fps} -safe 0 -f concat -i {demuxer_path} {0} \
         -vf scale={1}:{2}:force_original_aspect_ratio=decrease\
-        ,pad={1}:{2}:(ow-iw)/2:(oh-ih)/2:'{background}' ",
+        ,pad={1}:{2}:(ow-iw)/2:(oh-ih)/2:'{background}'",
         &videoopts.ffmpeg_args,
         &dimm.0,
         &dimm.1,
@@ -152,7 +155,7 @@ fn generate_thumbnail(
             &tmpdir.path().display(),
             &tmpdir.path().read_dir().unwrap().count()
         ))
-        .arg(format!("{}.jxl", &video_filename))
+        .arg(format!("{}.jpg", &video_filename))
         .status()?;
     tmpdir.close()?;
 
@@ -160,7 +163,7 @@ fn generate_thumbnail(
 }
 
 /// Get most frequent width & hight from images
-fn get_video_dimm_from_images(images: &[PathBuf]) -> Option<(u32, u32)> {
+fn get_video_dimm_from_images(images: &[PathBuf], no_confirm: bool) -> Option<(u32, u32)> {
     let mut images_w = Vec::<u32>::new();
     let mut images_h = Vec::<u32>::new();
     images
@@ -191,7 +194,7 @@ fn get_video_dimm_from_images(images: &[PathBuf]) -> Option<(u32, u32)> {
         })
         .count()
         != 0;
-    if be_resized {
+    if be_resized && !no_confirm {
         println!("Please press 'Enter'");
         std::io::stdin().read_line(&mut String::new()).unwrap();
     }

@@ -8,6 +8,7 @@ A collection of modules for image gallery manipulations, such as: creating anima
     - [Find images with desired bpp (`bpp`)](#find-images-with-desired-bpp-bpp)
     - [Find Monochrome images (`monochrome`)](#find-monochrome-images-monochrome)
     - [Find images by dimmensions (`resizable`)](#find-images-by-dimmensions-resizable)
+    - [Find similar images (`similar`)](#find-similar-images-similar)
   - [Animation / Slideshow creation (`gen`)](#animation--slideshow-creation-gen)
     - [Slideshow from images in folder (`video`)](#slideshow-from-images-in-folder-video)
     - [Animation from `.zip`: frames + json (`zip2video`)](#animation-from-zip-frames--json-zip2video)
@@ -49,6 +50,10 @@ Default target: 3508px
 ```bash
 ims-rs find resizable -s 4961 --p --keep-empty
 ```
+
+### Find similar images (`similar`)
+
+Find similar images using image hashes
 
 ## Animation / Slideshow creation (`gen`)
 

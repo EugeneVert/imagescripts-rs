@@ -5,33 +5,31 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::AppSettings;
+use clap::{AppSettings, Parser};
 use image::GenericImageView;
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use structopt::StructOpt;
 
 use crate::modules::utils;
 
 #[rustfmt::skip]
-#[derive(StructOpt, Debug)]
-#[structopt(name = "imagescripts-rs find", about = " ")]
-#[structopt(setting = AppSettings::ColoredHelp, setting = AppSettings::AllowNegativeNumbers)]
+#[derive(Parser, Debug)]
+#[clap(setting = AppSettings::AllowNegativeNumbers)]
 struct Opt {
     /// input image paths
-    #[structopt(required = false, default_value = "./*", display_order = 0)]
+    #[clap(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
     /// output directory path
-    #[structopt(short, required = false, default_value = "./monochrome", display_order = 0)]
+    #[clap(short, required = false, default_value = "./monochrome", display_order = 0)]
     out_dir: PathBuf,
-    #[structopt(short, default_value = "0.1")]
+    #[clap(short, default_value = "0.1")]
     /// MSE cutoff
     threshold: f32,
-    #[structopt(long, default_value = "0")]
+    #[clap(long, default_value = "0")]
     nproc: usize,
 }
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
-    let opt = Opt::from_iter(args);
+    let opt = Opt::parse_from(args);
 
     let mut images = opt.input.to_owned();
     utils::ims_init(&mut images, opt.out_dir.as_path(), Some(opt.nproc))?;

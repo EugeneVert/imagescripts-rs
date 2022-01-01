@@ -31,8 +31,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "bpp" => modules::find::bpp::main(args4module)?,
                 "monochrome" => modules::find::monochrome::main(args4module)?,
                 "resizable" => modules::find::resizable::main(args4module)?,
+                "similar" => modules::find::similar::main(args4module)?,
                 // "samesize" => {}
-                // "simmilar" => {}
                 _ => (print_err(selector_submodule)),
             };
         }
