@@ -37,7 +37,8 @@ Checks if the image is monochrome by computing Mean Squared Error (x100) from me
 **Example**
 
 ```bash
-ims-rs find monochrome -t 0.1
+ims-rs find monochrome --nproc 16 -t 0.8 -o "./monochrome"
+ims-rs find monochrome --nproc 16 -t 1000 -o "./maybe_monochrome"
 ```
 
 ### Find images by dimmensions (`resizable`)
@@ -110,7 +111,7 @@ Supports output to cli/csv
 
 ```bash
 ims-rs cmds --metrics --csv -c \
-    "avif:--min 0 --max 10" \
+    "avif:--min 0 --max 10" -c \
     "cjxl:-d 1" -- ./1.png
 ```
 

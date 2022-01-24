@@ -6,7 +6,7 @@ use std::{
 };
 
 use clap::{AppSettings, Parser};
-use image::GenericImageView;
+use image::{GenericImageView, Rgb};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use crate::modules::utils;
@@ -21,11 +21,14 @@ struct Opt {
     /// output directory path
     #[clap(short, required = false, default_value = "./monochrome", display_order = 0)]
     out_dir: PathBuf,
-    #[clap(short, default_value = "0.1")]
     /// MSE cutoff
+    #[clap(short, default_value = "0.8")]
     threshold: f32,
     #[clap(long, default_value = "0")]
     nproc: usize,
+    /// Don't move images
+    #[clap(short = 's')]
+    test: bool,
 }
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
@@ -47,6 +50,9 @@ fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(),
     let img_image = image::open(&img)?;
 
     if !image_is_colorful(img_image, opt.threshold) {
+        if opt.test {
+            return Ok(());
+        }
         let save_path = out_dir.join(img.file_name().unwrap());
         std::fs::rename(img, save_path)?;
     }
@@ -62,9 +68,9 @@ fn image_is_colorful(img: image::DynamicImage, threshold: f32) -> bool {
         let dim = core::cmp::max(dim.0, dim.1);
         let thumb_size;
         if dim < 2048 {
-            thumb_size = 32;
+            thumb_size = 128;
         } else {
-            thumb_size = 64;
+            thumb_size = 256;
         }
         // resize image
         let thumb = image::imageops::resize(
@@ -80,7 +86,7 @@ fn image_is_colorful(img: image::DynamicImage, threshold: f32) -> bool {
 
 #[allow(clippy::float_cmp)] // '==' was not used on any calculated value
 /// https://en.wikipedia.org/wiki/HSL_and_HSV#From_RGB
-fn rgb2hsv(rgb: &image::Rgb<u8>) -> [f32; 3] {
+fn rgb2hsv(rgb: &Rgb<u8>) -> [f32; 3] {
     let rgb = rgb.0;
 
     let r = rgb[0] as f32 / 255.0;
@@ -104,16 +110,39 @@ fn rgb2hsv(rgb: &image::Rgb<u8>) -> [f32; 3] {
         };
         saturation = chroma / value;
     }
-    [hue, saturation, value]
+
+    if hue >= 0.0 {
+        [hue, saturation, value]
+    } else {
+        [hue + 360.0, saturation, value]
+    }
 }
 
 fn image_mean_color(image: &image::ImageBuffer<image::Rgb<u8>, Vec<u8>>) -> image::Rgb<u8> {
-    let mut mean: [i32; 3] = [0, 0, 0];
+    let mut mean: [u64; 3] = [0, 0, 0];
+    let mut count = 0;
+
     for pixel in image.pixels() {
+        // skip too light/dark pixels
+        let pixel_hsv = rgb2hsv(pixel);
+        if pixel_hsv[1] < 0.1 || pixel_hsv[2] < 0.1 {
+            continue;
+        }
+
         for (i, v) in mean.iter_mut().enumerate() {
-            *v = (*v + pixel.0[i] as i32) / 2;
+            *v += pixel.0[i] as u64;
+        }
+        count += 1
+    }
+
+    for v in mean.iter_mut() {
+        if count != 0 {
+            *v /= count;
+        } else {
+            *v = 0;
         }
     }
+
     image::Rgb::from([mean[0] as u8, mean[1] as u8, mean[2] as u8])
 }
 
@@ -126,6 +155,7 @@ fn image_is_monochrome_by_MSE(
     adjust_color_bias: bool,
 ) -> bool {
     let mut sse = 0.0;
+    let mut sse_step: f32;
     let mut hue_bias = 0.0;
     if adjust_color_bias {
         hue_bias = rgb2hsv(&image_mean_color(image))[0];
@@ -133,10 +163,17 @@ fn image_is_monochrome_by_MSE(
 
     for pixel in image.pixels() {
         let pixel_hsv = rgb2hsv(pixel);
-        if (pixel_hsv[0] - hue_bias).abs() < f32::EPSILON || pixel_hsv[0] < f32::EPSILON {
+        if pixel_hsv[1] < 0.1
+            || pixel_hsv[2] < 0.1
+            || (pixel_hsv[0] - hue_bias).abs() < f32::EPSILON
+        {
             continue;
         }
-        sse += (pixel_hsv[1] - hue_bias).powi(2);
+        sse_step = (pixel_hsv[0] - hue_bias).abs();
+        if sse_step > 180.0 {
+            sse_step -= 360.0;
+        }
+        sse += sse_step.powi(2);
     }
 
     let image_dimensions = image.dimensions();
