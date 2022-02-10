@@ -25,6 +25,9 @@ struct Opt {
     /// video container
     #[clap(short, long = "container")]
     container: Option<String>,
+    /// force overwrite existing file
+    #[clap(short = 'y')]
+    overwrite: bool,
     ///
     #[clap(long)]
     two_pass: Option<bool>,
@@ -54,13 +57,15 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
     let demuxerf_path = tempdir.path().join("concat_demuxer");
     utils::ffmpeg_demuxer_create_from_json(&demuxerf_path, &json_mux)?;
-    let ffmpeg_cmd = format!(
+    let mut ffmpeg_cmd = format!(
         "-f concat -i {} {} \
         -vf pad=ceil(iw/2)*2:ceil(ih/2)*2'",
         &demuxerf_path.display(),
         &videoopts.ffmpeg_args,
     );
-
+    if opt.overwrite {
+        ffmpeg_cmd += " -y"
+    }
     let container = videoopts.container.expect("No video container");
     let two_pass = videoopts.two_pass.expect("No encoder passes count");
     let filestem = opt
