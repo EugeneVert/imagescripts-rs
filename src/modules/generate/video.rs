@@ -43,9 +43,12 @@ struct Opt {
     /// generate video thumbnail
     #[clap(short = 't', long = "thumb")]
     create_thumbnail: bool,
-    /// amount of 2x2 thumbnail sheets
-    #[clap(short = 's', long = "thumb_sheets", default_value = "2")]
+    /// amount of thumbnail sheets
+    #[clap(short = 's', long = "sheet_count", default_value = "2")]
     thumbnail_sheets: usize,
+    /// thumbnail sheet size
+    #[clap(long = "sheet_size", default_value = "2x2")]
+    thumbnail_size: String,
     /// Don't ask for resize confirmation
     #[clap(short = 'n', long = "no_confirm")]
     no_confirm: bool,
@@ -100,16 +103,29 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
     if opt.create_thumbnail {
         let video_filename = format!("{}.{}", &output_filestem, &container);
-        generate_thumbnail(&video_filename, images.len(), opt.thumbnail_sheets)?;
+        generate_thumbnail(
+            &video_filename,
+            images.len(),
+            opt.thumbnail_sheets,
+            get_thumbnail_size(&opt.thumbnail_size)?,
+        )?;
     }
 
     Ok(())
+}
+
+fn get_thumbnail_size(a: &str) -> std::result::Result<(usize, usize), Box<dyn Error>> {
+    if let Some(sizes) = a.split_once('x') {
+        return Ok((sizes.0.parse()?, sizes.1.parse()?));
+    }
+    Err("Can't parse thumbnail_size".into())
 }
 
 fn generate_thumbnail(
     video_filename: &str,
     n_frames: usize,
     thumbnail_sheets: usize,
+    thumbnail_size: (usize, usize),
 ) -> Result<(), std::io::Error> {
     let tmpdir = tempfile::tempdir()?;
 
@@ -127,9 +143,12 @@ fn generate_thumbnail(
             fontcolor=white:                                              \
             bordercolor=black:borderw=1,thumbnail=n={}",
             {
-                let m = (n_frames as f32 / (thumbnail_sheets as f32 * 4.0)).ceil() as usize;
+                // thumbnail=n={}
+                let images_in_thumbnail = thumbnail_size.0 * thumbnail_size.1;
+                let m = (n_frames as f32 / ((thumbnail_sheets * images_in_thumbnail) as f32)).ceil()
+                    as usize;
                 match m {
-                    m if m < 2 => 2,
+                    m if m < 2 => 2, // Don't make thumbnail from every frame
                     _ => m,
                 }
             },
@@ -140,16 +159,16 @@ fn generate_thumbnail(
         .arg(format!("{}/capture%002d.png", &tmpdir.path().display()))
         .status()?;
 
-    const MONTAGE_ARGS_2X2: [&str; 6] = [
+    let montage_args: [&str; 6] = [
         "-geometry",
         "+1+1", // add 1px border
         "-tile",
-        "2x2", // 2x2 images grid
+        &format!("{}x{}", thumbnail_size.0, thumbnail_size.1), // thumbnail grid
         "-background",
         "black",
     ];
     std::process::Command::new("montage")
-        .args(MONTAGE_ARGS_2X2)
+        .args(montage_args)
         .arg(&format!(
             "{}/capture%02d.png[1-{}]",
             &tmpdir.path().display(),
