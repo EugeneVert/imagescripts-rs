@@ -26,6 +26,8 @@ struct Opt {
     threshold: f32,
     #[clap(long, default_value = "0")]
     nproc: usize,
+    #[clap(short)]
+    grayscale: bool,
     /// Don't move images
     #[clap(short = 's')]
     test: bool,
@@ -49,7 +51,7 @@ fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(),
     println!("File: {}", img.display());
     let img_image = image::open(&img)?;
 
-    if !image_is_colorful(img_image, opt.threshold) {
+    if !image_is_monochrome(img_image, opt.threshold, opt.grayscale) {
         if opt.test {
             return Ok(());
         }
@@ -60,8 +62,7 @@ fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(),
     Ok(())
 }
 
-/// Checks if any pixel of a resized image has chroma over the threshold
-fn image_is_colorful(img: image::DynamicImage, threshold: f32) -> bool {
+fn image_is_monochrome(img: image::DynamicImage, threshold: f32, grayscale: bool) -> bool {
     if img.color().has_color() {
         // calculate thumbnail size
         let dim = img.dimensions();
@@ -79,7 +80,7 @@ fn image_is_colorful(img: image::DynamicImage, threshold: f32) -> bool {
             thumb_size,
             image::imageops::Nearest,
         );
-        return !image_is_monochrome_by_MSE(&thumb, threshold, true);
+        return !image_is_monochrome_by_MSE(&thumb, threshold, true, grayscale);
     }
     false
 }
@@ -153,6 +154,7 @@ fn image_is_monochrome_by_MSE(
     image: &image::ImageBuffer<image::Rgb<u8>, Vec<u8>>,
     mse_cutoff: f32,
     adjust_color_bias: bool,
+    grayscale: bool,
 ) -> bool {
     let mut sse = 0.0;
     let mut sse_step: f32;
@@ -163,15 +165,20 @@ fn image_is_monochrome_by_MSE(
 
     for pixel in image.pixels() {
         let pixel_hsv = rgb2hsv(pixel);
-        if pixel_hsv[1] < 0.1
-            || pixel_hsv[2] < 0.1
-            || (pixel_hsv[0] - hue_bias).abs() < f32::EPSILON
+        if pixel_hsv[1] < 0.05
+            || pixel_hsv[1] > 0.99
+            || pixel_hsv[2] < 0.02
         {
             continue;
         }
-        sse_step = (pixel_hsv[0] - hue_bias).abs();
-        if sse_step > 180.0 {
-            sse_step -= 360.0;
+        if grayscale {
+            sse_step = pixel_hsv[1] * 25.0;
+        } else {
+            sse_step = (pixel_hsv[0] - hue_bias).abs();
+
+            if sse_step > 180.0 {
+                sse_step -= 360.0;
+            }
         }
         sse += sse_step.powi(2);
     }
