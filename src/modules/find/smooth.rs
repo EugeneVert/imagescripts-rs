@@ -1,0 +1,90 @@
+use std::{error::Error, path::PathBuf, ffi::OsString};
+
+use clap::Parser;
+use image::{
+    ImageBuffer,
+    // ImageResult,
+    Luma,
+};
+// use imageproc::definitions::Image;
+
+#[derive(Parser, Debug)]
+#[clap(about = "Program for finding images without clean lines")]
+struct Opt {
+    /// input file
+    #[clap(short)]
+    input: PathBuf,
+    /// mv dir
+    #[clap(short)]
+    output: Option<PathBuf>,
+    /// threshold to mv
+    #[clap(short, default_value = "3.25")]
+    threshold: f32,
+}
+
+pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
+    let opt = Opt::parse_from(args);
+    let img = image::open(&opt.input)?;
+
+    let mut img = img.to_luma8();
+    imageproc::contrast::equalize_histogram_mut(&mut img);
+    // let wh = img.dimensions();
+    // #[rustfmt::skip]
+    // const KERNEL_VEC: &[f32] = &[
+    // 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+    // 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5,
+    // 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5,
+    // 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5,
+    // 0.5, 0.0, 0.0, 0.0, -18.0, 0.0, 0.0, 0.0, 0.5,
+    // 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5,
+    // 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5,
+    // 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5,
+    // 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
+
+    // let kernel = imageproc::filter::Kernel::new(KERNEL_VEC, 9, 9);
+
+    // println!(
+    //     "Please enter canny filter arguments \
+    //     ( low_threshold: f32 )+( high_threshold: f32 )"
+    // );
+    // let mut input = String::new();
+    // loop {
+    //     std::io::stdin()
+    //         .read_line(&mut input)
+    //         .expect("error: unable to read user input");
+    //     if input.trim_end().is_empty() {
+    //         break;
+    //     }
+    //     let canny_args = input.clone();
+    //     let canny_args = canny_args
+    //         .trim_end()
+    //         .split_once('+')
+    //         .expect("error: unable to read user input");
+    //     input.clear();
+    //     let canny_args = (
+    //         canny_args.0.parse::<f32>().unwrap(),
+    //         canny_args.1.parse::<f32>().unwrap(),
+    //     );
+    let out = imageproc::edges::canny(&img, 128.0, 256.0);
+    let out1 = imageproc::edges::canny(&img, 32.0, 64.0);
+    let sum_div = pixels_sum(&out1) as f32 / pixels_sum(&out) as f32;
+    println!("sum_div: {}", sum_div);
+    if sum_div > opt.threshold {
+        if let (Some(o), Some(n)) = (opt.output, &opt.input.file_name()) {
+            if !o.exists() {
+                std::fs::create_dir(&o)?;
+            }
+            std::fs::rename(&opt.input, &o.join(n))?;
+        }
+    }
+    // }
+    Ok(())
+}
+
+fn pixels_sum(img: &ImageBuffer<Luma<u8>, Vec<u8>>) -> i64 {
+    let mut sum = 0;
+    for i in img.pixels() {
+        sum += i.0[0] as i64;
+    }
+    sum
+}
