@@ -110,7 +110,7 @@ Supports output to cli/csv
 **Example:**
 
 ```bash
-ims-rs cmds --metrics --csv -c \
+ims-rs cmds --save --csv -c \
     "avif:--min 0 --max 10" -c \
     "cjxl:-d 1" -- ./1.png
 ```
@@ -120,8 +120,7 @@ ims-rs cmds --metrics --csv -c \
 ```bash
 avifenc --min 0 --max 10
 117.0KiB --> 10.0KiB      0.04bpp         0.59s         8%
-butteraugli_max_norm: 1.4058256149       butteraugli_pnorm:  0.753503    ssimulacra: 0.00116743
 cjxl -d 1
 117.0KiB --> 10.8KiB      0.04bpp         1.32s         9%
-butteraugli_max_norm: 1.8223860264       butteraugli_pnorm:  1.790489    ssimulacra: 0.00102578
 ```
+
