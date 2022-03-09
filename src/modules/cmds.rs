@@ -26,10 +26,10 @@ struct Opt {
     /// "{encoder}>:{decoder}>:{extension}>:{output_from_stdout [0;1]}:>{args}"
     #[clap(short, required = true)]
     cmds: Vec<String>,
-    /// percentage tolerance of commands to the following ones{n}
-    /// (cmd res. filesize to orig. filesize precentage){n} (when not saving all results)
-    #[clap(short, long, default_value = "10")]
-    tolerance: u32,
+    /// (KiB) tolerance of commands to the following ones{n}
+    /// {n} (when not saving all results)
+    #[clap(short, long, default_value = "100")]
+    tolerance: usize,
     /// save all encoded images (Not only the best compressed one)
     #[clap(long = "save")]
     save_all: bool,
@@ -97,7 +97,7 @@ fn process_image(
     opt: &Opt,
 ) -> Result<String, Box<dyn Error + Send + Sync>> {
     println!("{}", &img.display());
-    let img_filesize = img.metadata()?.len() as u32;
+    let img_filesize = img.metadata()?.len() as usize;
     let img_dimensions = image::image_dimensions(&img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
 
@@ -113,7 +113,7 @@ fn process_image(
         })
         .collect::<Result<_, _>>()?;
 
-    let mut res_filesize: u32 = 0;
+    let mut res_filesize: usize = 0;
     let mut res_buff = &ImageBuffer::new();
 
     // csv | open writer, push orig image filename&size
@@ -138,7 +138,7 @@ fn process_image(
 
     // Caclculate & print info for each ImageBuffer
     for (i, buff) in enc_img_buffers.iter().enumerate() {
-        let buff_filesize = buff.get_image_size() as u32;
+        let buff_filesize = buff.get_size();
         let buff_bpp = (buff_filesize * 8) as f64 / px_count as f64;
         let percentage_of_original = format!("{:.2}", (100 * buff_filesize / img_filesize));
         let printing_status = format!(
@@ -175,14 +175,12 @@ fn process_image(
             continue;
         }
 
-        // difference between the res_buf and current buf
-        // to orig file percentages must be greater than the tolerance
-        let tolerance = opt.tolerance as f64; // %
+        let tolerance = opt.tolerance * 1024; // KiB
 
         if res_filesize == 0
             || buff_filesize != 0
-                && (res_filesize as f64 - buff_filesize as f64)
-                    > img_filesize as f64 * tolerance * 0.01
+                && ((res_filesize as i64 - buff_filesize as i64)
+                    > tolerance as i64)
         {
             res_buff = buff;
             res_filesize = buff_filesize;
@@ -241,7 +239,7 @@ impl<'a> ImageBuffer<'a> {
         }
     }
 
-    fn get_image_size(&self) -> usize {
+    fn get_size(&self) -> usize {
         core::mem::size_of_val(&self.image[..])
     }
 
