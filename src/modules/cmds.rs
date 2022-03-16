@@ -1,5 +1,4 @@
 use std::{
-    collections::hash_map::HashMap,
     error::Error,
     ffi::{OsStr, OsString},
     io::Write,
@@ -17,13 +16,14 @@ type BytesIO = Vec<u8>;
 struct Opt {
     /// input image paths
     #[clap(required = false, default_value = "./*", display_order = 0)]
-    input: Vec<PathBuf>,
+    input: PathBuf,
     #[clap(short, takes_value = true, default_value = "./out")]
     out_dir: PathBuf,
     /// avaible presets:    {n}
     /// "cjxl:{args}", "avif:{args}", "jpeg:{args}", "cwebp:{args}", png:{} {n}
     /// custom cmd format:  {n}
-    /// "{encoder}>:{decoder}>:{extension}>:{output_from_stdout [0;1]}:>{args}"
+    /// "{encoder}>:{extension}>:{output_from_stdout [0;1]}:>{args}"
+    ////      {decoder}>:
     #[clap(short, required = true)]
     cmds: Vec<String>,
     /// (KiB) tolerance of commands to the following ones{n}
@@ -51,10 +51,14 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 
     let csv_path = &opt.csv_path;
 
-    let mut images = opt.input.to_owned();
-    utils::ims_init(&mut images, &opt.out_dir, Some(opt.nproc))?;
+    // utils::ims_init(&mut images, &opt.out_dir, Some(opt.nproc))?;
+    utils::mkdir(&opt.out_dir)?;
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(opt.nproc)
+        .build_global()?;
 
-    if opt.save_csv {
+    // write csv header with cmds
+    if opt.save_csv && !csv_path.exists() {
         let csv_file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -75,18 +79,10 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
         csv_writer.flush()?;
     }
 
-    let mut resultmap: HashMap<String, usize> = HashMap::new();
-    for img in images {
-        match process_image(&img, csv_path, &opt) {
-            Ok(c) => *resultmap.entry(c).or_default() += 1,
-            Err(e) => println!("Can't process image {}: {}", &img.display(), &e),
-        }
+    match process_image(&opt.input, csv_path, &opt) {
+        Ok(_) => (),
+        Err(e) => println!("Can't process image {}: {}", &opt.input.display(), &e),
     }
-    println!("stats: \ncount\t cmd");
-    resultmap
-        .iter()
-        .for_each(|(k, v)| println!("{}\t {}", v, k));
-
     Ok(())
 }
 
@@ -120,7 +116,7 @@ fn process_image(
     let save_csv = opt.save_csv;
     let mut csv_row = Vec::<String>::new();
 
-    let mut csv_writer = if save_csv {
+    let mut csv_writer = if opt.save_csv {
         let csv_file = std::fs::OpenOptions::new()
             .write(true)
             .append(true)
@@ -167,7 +163,7 @@ fn process_image(
                 img.file_stem()
                     .and_then(OsStr::to_str)
                     .ok_or_else(|| format!("No filestem: {}", img.display()))?,
-                i.to_string(),
+                i,
                 &buff.ext
             ));
             let mut f = std::fs::File::create(save_path)?;
@@ -215,12 +211,15 @@ fn process_image(
 struct ImageBuffer<'a> {
     image: BytesIO,
     cmd: &'a str,
+    /// Encoder command (e.g. `cjxl`)
     cmd_enc: String,
+    /// Encoder arguments
     cmd_enc_args: Vec<String>,
+    /// Get image [from stdout | temporary file]
     cmd_enc_output_from_stdout: bool,
-    cmd_dec: String,
-    cmd_dec_args: Vec<String>,
+    /// Result image file extension (suffix)
     ext: String,
+    /// execution time
     ex_time: core::time::Duration,
 }
 
@@ -232,8 +231,6 @@ impl<'a> ImageBuffer<'a> {
             cmd_enc: String::new(),
             cmd_enc_args: Vec::new(),
             cmd_enc_output_from_stdout: false,
-            cmd_dec: String::new(),
-            cmd_dec_args: Vec::new(),
             ext: String::new(),
             ex_time: core::time::Duration::new(0, 0),
         }
@@ -282,30 +279,24 @@ impl<'a> ImageBuffer<'a> {
             "jpeg" => {
                 self.ext = "jpg".into();
                 self.cmd_enc = "cjpeg".into();
-                self.cmd_dec = "djpeg".into();
                 self.cmd_enc_output_from_stdout = true;
             }
             // TODO use image crate to convert into png
             "png" => {
                 self.ext = "png".into();
                 self.cmd_enc = "convert".into();
-                self.cmd_dec = "convert".into();
             }
             "cjxl" => {
                 self.ext = "jxl".into();
                 self.cmd_enc = "cjxl".into();
-                self.cmd_dec = "djxl".into();
             }
             "avif" => {
                 self.ext = "avif".into();
                 self.cmd_enc = "avifenc".into();
-                self.cmd_dec = "avifdec".into();
             }
             "cwebp" => {
                 self.ext = "webp".into();
                 self.cmd_enc = "cwebp".into();
-                self.cmd_dec = "dwebp".into();
-                self.cmd_dec_args = vec!["-o".into()];
             }
             _ => panic!("match error, cmd '{}' not supported", &cmd_preset),
         }
@@ -321,27 +312,13 @@ impl<'a> ImageBuffer<'a> {
         self.cmd_enc_args = cmd_args[4].split(' ').map(|s| s.to_owned()).collect();
         self.ext = cmd_args[0].to_string();
         self.cmd_enc = cmd_args[1].to_string();
-        self.cmd_dec = cmd_args[2].to_string();
-        self.cmd_enc_output_from_stdout = cmd_args[3]
+        self.cmd_enc_output_from_stdout = cmd_args[2]
             .parse::<u8>()
             .expect("wrong 'output_from_stdout' flag")
             .ne(&0);
         self.gen_from_cmd(img_path)?;
         Ok(())
     }
-
-    // fn image_decode(&self) -> Result<tempfile::NamedTempFile, Box<dyn Error>> {
-    //     let mut tf = tempfile::NamedTempFile::new()?;
-    //     let tf_out = tempfile::Builder::new().suffix(".png").tempfile()?;
-    //     tf.write_all(&self.image)?;
-    //     let outp = std::process::Command::new(&self.cmd_dec)
-    //         .arg(tf.path())
-    //         .args(&self.cmd_dec_args)
-    //         .arg(tf_out.path())
-    //         .output()?;
-    //     command_print_if_error(&outp)?;
-    //     Ok(tf_out)
-    // }
 
     fn gen_from_cmd(&mut self, img_path: &Path) -> std::io::Result<()> {
         // no arguments -> return None
