@@ -15,7 +15,7 @@ type BytesIO = Vec<u8>;
 #[derive(Parser, Debug)]
 struct Opt {
     /// input image paths
-    #[clap(required = false, default_value = "./*", display_order = 0)]
+    #[clap(display_order = 0)]
     input: PathBuf,
     #[clap(short, takes_value = true, default_value = "./out")]
     out_dir: PathBuf,
@@ -24,7 +24,7 @@ struct Opt {
     /// custom cmd format:  {n}
     /// "{encoder}>:{extension}>:{output_from_stdout [0;1]}:>{args}"
     ////      {decoder}>:
-    #[clap(short, required = true)]
+    #[clap(short, multiple_values(true))]
     cmds: Vec<String>,
     /// (KiB) tolerance of commands to the following ones{n}
     /// {n} (when not saving all results)
