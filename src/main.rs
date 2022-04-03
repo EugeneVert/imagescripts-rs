@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "monochrome" => modules::find::monochrome::main(args4module)?,
                 "resizable" => modules::find::resizable::main(args4module)?,
                 "similar" => modules::find::similar::main(args4module)?,
-                "smooth" => modules::find::smooth::main(args4module)?,
+                "detailed" => modules::find::detailed::main(args4module)?,
                 // "samesize" => {}
                 _ => (print_err(selector_submodule)),
             };
@@ -60,7 +60,7 @@ Avaible options:
         monochrome
         resizable
         similar
-        smooth
+        detailed
     gen  ---\\
         ffmpeg_concat
         video

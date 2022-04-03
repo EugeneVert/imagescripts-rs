@@ -5,7 +5,7 @@ pub mod modules {
         pub mod monochrome;
         pub mod resizable;
         pub mod similar;
-        pub mod smooth;
+        pub mod detailed;
     }
     pub mod generate {
         pub mod ffmpeg_concat;
