@@ -24,7 +24,7 @@ struct Opt {
     // /// max_diff
     // #[clap(short, default_value = "12")]
     // max_diff: u32,
-    //// no_move
+    /// no_move
     #[clap(short)]
     no_move: bool
 
@@ -109,24 +109,41 @@ fn group_similar(res: &HashMap<PathBuf, ImageHash>, max_diff: u32) -> Vec<Vec<Pa
             groups.push(vec![p.to_path_buf()])
         }
     }
-    println!("{:?}", groups);
+
+    for i in groups.iter_mut() {
+        i.sort_unstable();
+        println!("{:?}", i)
+    }
     groups
 }
 
 fn gen_hash(img: &Path, hasher: &img_hash::HasherConfig) -> Result<ImageHash, Box<dyn Error>> {
     let img = match img.extension().unwrap_or_default() {
         x if x == "jxl" => {
-            let t = image_jxl_decode(img).unwrap();
-            image::open(t.path())
-        }
-        _ => image::open(img),
-    }?;
+            image_jxl_decode(img).map(|t| image::open(t.path()))
+        },
+        x if x == "avif" => {
+            image_avif_decode(img).map(|t| image::open(t.path()))
+        },
+        _ => Ok(image::open(img)),
+    }??;
     Ok(hasher.to_hasher().hash_image(&img))
 }
 
 fn image_jxl_decode(i: &Path) -> Result<tempfile::NamedTempFile, Box<dyn Error>> {
     let tf_out = tempfile::Builder::new().suffix(".png").tempfile()?;
     let outp = std::process::Command::new("djxl")
+        .arg(i)
+        .arg(tf_out.path())
+        .output()?;
+    command_print_if_error(&outp)?;
+    Ok(tf_out)
+}
+
+fn image_avif_decode(i: &Path) -> Result<tempfile::NamedTempFile, Box<dyn Error>> {
+    let tf_out = tempfile::Builder::new().suffix(".png").tempfile()?;
+    let outp = std::process::Command::new("avifdec")
+        .args(["-d", "8", "--png-compress", "0"])
         .arg(i)
         .arg(tf_out.path())
         .output()?;
