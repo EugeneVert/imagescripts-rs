@@ -56,13 +56,11 @@ fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(),
     let img_dimensions = image::image_dimensions(&img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
     let img_bpp = (img_filesize * 8) as f32 / px_count as f32;
-    let img_metric;
-    if opt.custom_metric {
-        let img_metric_custom = img_bpp + px_count as f32 / 4194304_f32;
-        img_metric = img_metric_custom;
+    let img_metric = if opt.custom_metric {
+        img_bpp + px_count as f32 / 4194304_f32
     } else {
-        img_metric = img_bpp;
-    }
+        img_bpp
+    };
 
     println!("File: {}\n bpp: {:.3}", img.display(), img_metric);
     let mut save_flag: bool = false;

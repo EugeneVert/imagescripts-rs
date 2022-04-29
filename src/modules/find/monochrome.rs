@@ -48,7 +48,7 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
 }
 
 fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    println!("File: {}", img.display());
+    // println!("File: {}", img.display());
     let img_image = image::open(&img)?;
 
     if !image_is_monochrome(img_image, opt.threshold, opt.grayscale) {
@@ -67,12 +67,11 @@ fn image_is_monochrome(img: image::DynamicImage, threshold: f32, grayscale: bool
         // calculate thumbnail size
         let dim = img.dimensions();
         let dim = core::cmp::max(dim.0, dim.1);
-        let thumb_size;
-        if dim < 2048 {
-            thumb_size = 128;
+        let thumb_size = if dim < 2048 {
+            128
         } else {
-            thumb_size = 256;
-        }
+            256
+        };
         // resize image
         let thumb = image::imageops::resize(
             &img.into_rgb8(),

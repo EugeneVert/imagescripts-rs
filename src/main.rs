@@ -13,14 +13,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(x) => x.to_str().unwrap(),
         None => "None",
     };
-    println!("{} {}", selector_module, selector_submodule);
 
-    let args_ind;
-    if ["cmds", "size"].contains(&selector_module) {
-        args_ind = 1;
+    let args_ind = if ["cmds" /*, TODO "size" */].contains(&selector_module) {
+        1_usize
     } else {
-        args_ind = 2;
-    }
+        2_usize
+    };
 
     let args4module = args[args_ind..args.len()].to_vec();
     // println!("{:?}", args4module);

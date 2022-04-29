@@ -71,7 +71,7 @@ fn process_image(img: &Path, paths: &Paths, opt: &Opt) -> Result<(), Box<dyn Err
         .and_then(OsStr::to_str)
         .ok_or_else(|| format!("Can't get image filename: {}", &img.display()))?;
     let save_path: Option<PathBuf>;
-    println!("File: {}\nSize: {:?}", img.display(), img_dimmensions);
+    // println!("File: {}\nSize: {:?}", img.display(), img_dimmensions);
 
     if opt.png_sort && img.extension().unwrap_or_default().to_string_lossy() == "png" {
         if img_dimmensions.0 > opt.png_px_size || img_dimmensions.1 > opt.png_px_size {
@@ -94,7 +94,6 @@ fn process_image(img: &Path, paths: &Paths, opt: &Opt) -> Result<(), Box<dyn Err
 
 fn dir_del_if_empty(d: &Path) -> Result<(), std::io::Error> {
     if std::fs::read_dir(d)?.count() == 0 {
-        println!("Rm dir: {:?}", &d);
         std::fs::remove_dir(d)?;
     }
 
