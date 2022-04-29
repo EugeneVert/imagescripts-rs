@@ -99,19 +99,6 @@ fn process_image(
 
     let out_dir = &opt.out_dir;
 
-    // generate results in ImageBuffers for each cmd
-    let enc_img_buffers: Vec<ImageBuffer> = opt
-        .cmds
-        .par_iter()
-        .map(|cmd| {
-            let mut buff = ImageBuffer::new();
-            buff.image_generate(img, cmd).map(|_| buff)
-        })
-        .collect::<Result<_, _>>()?;
-
-    let mut res_filesize: usize = 0;
-    let mut res_buff = &ImageBuffer::new();
-
     // csv | open writer, push orig image filename&size
     let save_csv = opt.save_csv;
     let mut csv_row = Vec::<String>::new();
@@ -132,19 +119,38 @@ fn process_image(
         None
     };
 
+    let mut res_filesize: usize = 0;
+    let mut res_buff = &ImageBuffer::new();
+
+    // generate results in ImageBuffers for each cmd
+    let enc_img_buffers: Vec<ImageBuffer> = opt
+        .cmds
+        .par_iter()
+        .map(|cmd| {
+            let mut buff = ImageBuffer::new();
+            buff.image_generate(img, cmd).map(|_| buff)
+        })
+        .collect::<Result<_, _>>()?;
+
     // Caclculate & print info for each ImageBuffer
     for (i, buff) in enc_img_buffers.iter().enumerate() {
         let buff_filesize = buff.get_size();
         let buff_bpp = (buff_filesize * 8) as f64 / px_count as f64;
         let percentage_of_original = format!("{:.2}", (100 * buff_filesize / img_filesize));
+        let tolerance = opt.tolerance * 1024; // KiB
+        let better = buff_filesize != 0
+            && buff_filesize < img_filesize
+            && (res_filesize == 0
+                || (res_filesize as i64 - buff_filesize as i64) > tolerance as i64);
         let printing_status = format!(
-            "{}\n{} --> {}\t{:6.2}bpp\t{}%\t{:>6.2}s",
+            "{}\n{} --> {}\t{:6.2}bpp\t{}% {is_better}\t{:>6.2}s",
             &buff.get_cmd(),
             byte2size(img_filesize as u64),
             byte2size(buff_filesize as u64),
             &buff_bpp,
             percentage_of_original,
             &buff.ex_time.as_secs_f32(),
+            is_better = if better { "* " } else { "" },
         );
 
         println!("{}", printing_status);
@@ -171,13 +177,7 @@ fn process_image(
             continue;
         }
 
-        let tolerance = opt.tolerance * 1024; // KiB
-
-        if res_filesize == 0
-            || buff_filesize != 0
-                && ((res_filesize as i64 - buff_filesize as i64)
-                    > tolerance as i64)
-        {
+        if better {
             res_buff = buff;
             res_filesize = buff_filesize;
         }
@@ -192,7 +192,15 @@ fn process_image(
     if opt.save_all {
         return Ok("".into());
     }
+
     // save res_buf
+
+    if res_filesize == img_filesize {
+        std::fs::copy(img, out_dir.join(img.file_name().unwrap()))?;
+        println!("Save: Copy input");
+        return Ok("Copy input".into());
+    }
+
     let save_path = out_dir.join(format!(
         "{}.{}",
         img.file_stem()
@@ -200,9 +208,10 @@ fn process_image(
             .ok_or_else(|| format!("No filestem: {}", img.display()))?,
         &res_buff.ext
     ));
+
     let mut f = std::fs::File::create(save_path)?;
     f.write_all(&res_buff.image)?;
-    println!("save {}\n", &res_buff.cmd);
+    println!("Save: {}\n", &res_buff.cmd);
 
     Ok(res_buff.cmd.to_string())
 }
@@ -267,9 +276,9 @@ impl<'a> ImageBuffer<'a> {
         img_path: &Path,
         cmd: &str,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let cmd_preset = cmd.split_once(":").ok_or("Cmd argument error")?.0;
+        let cmd_preset = cmd.split_once(':').ok_or("Cmd argument error")?.0;
         self.cmd_enc_args = cmd
-            .split_once(":")
+            .split_once(':')
             .ok_or("Cmd subargument error")?
             .1
             .split(' ')
@@ -293,6 +302,10 @@ impl<'a> ImageBuffer<'a> {
             "avif" => {
                 self.ext = "avif".into();
                 self.cmd_enc = "avifenc".into();
+            },
+            "cavif" => {
+                self.ext = "avif".into();
+                self.cmd_enc = "cavif".into();
             }
             "cwebp" => {
                 self.ext = "webp".into();
