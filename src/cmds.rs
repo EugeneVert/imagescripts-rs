@@ -54,12 +54,11 @@ pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     //     args = std::env::args_os().collect();
     // }
     let opt = Opt::parse_from(args);
-    println!("{:?}", &opt);
     let mut images = opt.input.to_owned();
     utils::ims_init(&mut images, &opt.out_dir, opt.nproc_cmd)?;
 
     // write csv header with cmds
-    if opt.csv_save && !&opt.csv_path.exists() {
+    if opt.csv_save {
         let mut csv_output = csv_output::CsvOutput::new(&opt.csv_path)?;
         // csv header row
         csv_output.write_cmds_header(&opt.cmds)?;
@@ -98,10 +97,11 @@ fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send +
     let out_dir = &opt.out_dir;
 
     // csv | open writer, push orig image filename&size
-    let mut csv_row = Vec::<String>::new();
+    let cmds_count = opt.cmds.len();
+    let mut csv_row = vec![String::new(); cmds_count * 2 + 2];
     let mut csv_output = if opt.csv_save {
-        csv_row.push(img.to_string_lossy().to_string());
-        csv_row.push(img_filesize.to_string());
+        csv_row[0] = img.to_string_lossy().to_string();
+        csv_row[1] = img_filesize.to_string();
         Some(csv_output::CsvOutput::new(&opt.csv_path)?)
     } else {
         None
@@ -144,7 +144,8 @@ fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send +
         println!("{}", printing_status);
 
         if opt.csv_save {
-            csv_row.push(buff_filesize.to_string());
+            csv_row[2 + i] = buff_filesize.to_string();
+            csv_row[2 + cmds_count + i] = percentage_of_original;
         }
 
         if opt.save_all {

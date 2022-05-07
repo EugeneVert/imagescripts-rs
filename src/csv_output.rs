@@ -26,6 +26,7 @@ impl CsvOutput {
         for cmd in cmds {
             csv_row.push(cmd);
         }
+        csv_row.extend(vec!["%"; cmds.len()]);
         self.writer.write_record(csv_row)?;
         self.writer.flush()?;
         Ok(())
