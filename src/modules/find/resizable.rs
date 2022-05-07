@@ -18,84 +18,61 @@ struct Opt {
     /// search target
     #[clap(short = 's', long = "size", required = false, default_value = "3508", display_order = 0)]
     px_size: u32,
-    /// sort png files to the "PNG" folder
-    #[clap(long = "p")]
-    png_sort: bool,
     /// keep empty folder after sorting
     #[clap(long)]
     keep_empty: bool,
-    /// search target for png if png_sort is enabled
-    #[clap(long = "p:s", default_value="1754")]
-    png_px_size: u32,
     #[clap(long, default_value = "0")]
     nproc: usize,
 }
 
 pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
     let opt = Opt::parse_from(args);
-    let paths = Paths {
-        out_dir: Path::new("./").join(opt.px_size.to_string()),
-        out_dir_png: PathBuf::from("./PNG"),
-        out_dir_png_size: Path::new("./PNG").join(opt.png_px_size.to_string()),
-    };
-    utils::mkdir(&paths.out_dir_png)?;
-    utils::mkdir(&paths.out_dir_png_size)?;
+    let out_dir = Path::new("./").join(opt.px_size.to_string());
 
     let mut images = opt.input.to_owned();
-    utils::ims_init(&mut images, &paths.out_dir, Some(opt.nproc))?;
+    utils::ims_init(&mut images, &out_dir, Some(opt.nproc))?;
 
-    images.iter().par_bridge().for_each(|img| {
-        process_image(img, &paths, &opt)
-            .unwrap_or_else(|_| panic!("Can't process image: {}", &img.display()))
-    });
+    let images_to_mv = get_images_to_mv(&images, &opt);
 
-    if !opt.keep_empty {
-        dir_del_if_empty(&paths.out_dir_png_size)?;
-        dir_del_if_empty(&paths.out_dir_png)?;
-        dir_del_if_empty(&paths.out_dir)?;
+    if images_to_mv.is_empty() {
+        return Ok(())
+    }
+
+    for image in images_to_mv {
+        let filename = image
+            .file_name()
+            .and_then(OsStr::to_str)
+            .ok_or_else(|| format!("Can't get image filename: {}", &image.display()))?;
+        std::fs::rename(&image, out_dir.join(&filename))?;
     }
 
     Ok(())
 }
 
-struct Paths {
-    out_dir: PathBuf,
-    out_dir_png: PathBuf,
-    out_dir_png_size: PathBuf,
+fn get_images_to_mv(images: &[PathBuf], opt: &Opt) -> Vec<PathBuf> {
+    images
+        .iter()
+        .par_bridge()
+        .filter_map(|image| {
+            if is_image_to_move(image, opt).unwrap_or_else(|_| {
+                panic!(
+                    "Error, cannot check image dimmensions\n{}",
+                    &image.display()
+                )
+            }) {
+                Some(image.to_owned())
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
-fn process_image(img: &Path, paths: &Paths, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    let img_dimmensions = image::image_dimensions(&img)?;
-    let img_filename = img
-        .file_name()
-        .and_then(OsStr::to_str)
-        .ok_or_else(|| format!("Can't get image filename: {}", &img.display()))?;
-    let save_path: Option<PathBuf>;
-    // println!("File: {}\nSize: {:?}", img.display(), img_dimmensions);
-
-    if opt.png_sort && img.extension().unwrap_or_default().to_string_lossy() == "png" {
-        if img_dimmensions.0 > opt.png_px_size || img_dimmensions.1 > opt.png_px_size {
-            save_path = Some(paths.out_dir_png_size.join(img_filename));
-        } else {
-            save_path = Some(paths.out_dir_png.join(img_filename));
-        }
-    } else if img_dimmensions.0 > opt.px_size || img_dimmensions.1 > opt.px_size {
-        save_path = Some(paths.out_dir.join(img_filename));
+fn is_image_to_move(image: &Path, opt: &Opt) -> Result<bool, Box<dyn Error>> {
+    let img_dimmensions = image::image_dimensions(&image)?;
+    if img_dimmensions.0 > opt.px_size || img_dimmensions.1 > opt.px_size {
+        Ok(true)
     } else {
-        save_path = None;
+        Ok(false)
     }
-
-    if let Some(to) = save_path {
-        std::fs::rename(img, to)?;
-    }
-
-    Ok(())
-}
-
-fn dir_del_if_empty(d: &Path) -> Result<(), std::io::Error> {
-    if std::fs::read_dir(d)?.count() == 0 {
-        std::fs::remove_dir(d)?;
-    }
-
-    Ok(())
 }
