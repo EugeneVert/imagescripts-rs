@@ -7,7 +7,7 @@ use std::{
 
 use clap::{AppSettings, Parser};
 
-use crate::modules::utils;
+use crate::utils;
 
 #[derive(Parser, Debug)]
 #[structopt(setting = AppSettings::AllowHyphenValues)]

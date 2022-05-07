@@ -7,7 +7,7 @@ use std::{
 use clap::Parser;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
-use crate::modules::utils;
+use crate::utils;
 
 #[derive(Parser, Debug)]
 struct Opt {

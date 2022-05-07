@@ -8,7 +8,7 @@ use std::{
 use clap::Parser;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::modules::utils;
+use crate::utils;
 
 type BytesIO = Vec<u8>;
 

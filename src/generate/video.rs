@@ -9,7 +9,7 @@ use std::{
 
 use clap::{AppSettings, Parser};
 
-use crate::modules::utils;
+use crate::utils;
 
 #[derive(Parser, Debug)]
 #[clap(setting = AppSettings::AllowHyphenValues)]
@@ -207,9 +207,8 @@ fn get_video_dimm_from_images(images: &[PathBuf], no_confirm: bool) -> Option<(u
         .enumerate()
         .filter(|x| x.1 != (&w, &h))
         .map(|x| &images[x.0])
-        .map(|f| {
+        .inspect(|f| {
             println!("Image {} will be resized", f.display());
-            f
         })
         .count()
         != 0;

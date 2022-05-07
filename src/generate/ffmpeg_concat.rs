@@ -6,7 +6,7 @@ use std::{
 
 use clap::Parser;
 
-use crate::modules::utils;
+use crate::utils;
 
 #[derive(Parser, Debug)]
 struct Opt {

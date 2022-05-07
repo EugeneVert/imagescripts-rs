@@ -9,7 +9,7 @@ use clap::{AppSettings, Parser};
 use image::{GenericImageView, Rgb};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
-use crate::modules::utils;
+use crate::utils;
 
 #[rustfmt::skip]
 #[derive(Parser, Debug)]

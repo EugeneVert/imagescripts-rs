@@ -1,4 +1,4 @@
-use ims_rs::modules;
+use ims_rs::*;
 use std::ffi::OsString;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,22 +26,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match selector_module {
         "find" => {
             match selector_submodule {
-                "bpp" => modules::find::bpp::main(args4module)?,
-                "monochrome" => modules::find::monochrome::main(args4module)?,
-                "resizable" => modules::find::resizable::main(args4module)?,
-                "similar" => modules::find::similar::main(args4module)?,
-                "detailed" => modules::find::detailed::main(args4module)?,
+                "bpp" => find::bpp::main(args4module)?,
+                "monochrome" => find::monochrome::main(args4module)?,
+                "resizable" => find::resizable::main(args4module)?,
+                "similar" => find::similar::main(args4module)?,
+                "detailed" => find::detailed::main(args4module)?,
                 // "samesize" => {}
                 _ => (print_err(selector_submodule)),
             };
         }
         "gen" => match selector_submodule {
-            "ffmpeg_concat" => modules::generate::ffmpeg_concat::main(args4module)?,
-            "video" => modules::generate::video::main(args4module)?,
-            "zip2video" => modules::generate::zip2video::main(args4module)?,
+            "ffmpeg_concat" => generate::ffmpeg_concat::main(args4module)?,
+            "video" => generate::video::main(args4module)?,
+            "zip2video" => generate::zip2video::main(args4module)?,
             _ => (print_err(selector_submodule)),
         },
-        "cmds" => modules::cmds::main(args4module)?,
+        "cmds" => cmds::main(args4module)?,
         // TODO: "size" => {}
         _ => (print_err(selector_submodule)),
     };

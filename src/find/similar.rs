@@ -9,7 +9,7 @@ use clap::{AppSettings, Parser};
 use img_hash::{HashAlg, HasherConfig, ImageHash};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::modules::utils::{self, mkdir};
+use crate::utils::{self, mkdir};
 
 #[rustfmt::skip]
 #[derive(Parser, Debug)]
