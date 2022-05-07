@@ -21,6 +21,11 @@ struct Opt {
     input: Vec<PathBuf>,
     #[clap(short, default_value = "./out")]
     out_dir: PathBuf,
+    /// {preset}:{args} {n}
+    /// avaible presets:    {n}
+    /// cjxl, avifenc, cafiv, cjpeg, cwebp, png {n}
+    /// custom cmd format:  {n}
+    /// "{extension}:{encoder}[>(if output to stdout)]:{args}"
     #[clap(short, multiple_values(true))]
     cmds: Vec<String>,
     /// (KiB) tolerance of commands to the following ones{n}
@@ -215,36 +220,43 @@ struct ImageBuffer {
 
 impl ImageBuffer {
     fn new(cmd: &str) -> ImageBuffer {
-        let preset = !cmd.contains(">:");
+        let split_indexes = cmd.match_indices(':').map(|m| m.0).collect::<Vec<usize>>();
+        let preset = match split_indexes.len() {
+            1 => true,
+            2 => false,
+            _ => panic!("Error parsing cmd"),
+        };
+        // let preset = !cmd.contains(">:");
         if preset {
-            let split = cmd
-                .split_once(':')
-                .unwrap_or_else(|| panic!("Cmd subargument error"));
+            let (encoder, args) = (
+                cmd[..split_indexes[0]].to_owned(),
+                cmd[split_indexes[0] + 1..].to_owned(),
+            );
             let mut ib = ImageBuffer {
-                image: Vec::new(),
-                encoder: split.0.to_owned(),
-                args: split.1.split(' ').map(|s| s.to_owned()).collect(),
-                output_from_stdout: false,
-                output_extension: String::new(),
-                duration: core::time::Duration::new(0, 0),
+                encoder: encoder.to_owned(),
+                args: args.split(' ').map(|s| s.to_owned()).collect(),
+                ..Default::default()
             };
-            ib.match_preset(split.0);
+            ib.match_preset(&encoder);
             ib
         } else {
-            let split = cmd
-                .split(">:")
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
+            let (output_extension, mut encoder, args) = (
+                cmd[..split_indexes[0]].to_owned(),
+                cmd[split_indexes[0] + 1..split_indexes[1]].to_owned(),
+                cmd[split_indexes[1] + 1..].to_owned(),
+            );
+
+            let output_from_stdout = encoder.ends_with('>');
+            if output_from_stdout {
+                encoder.pop();
+            };
+
             ImageBuffer {
-                image: Vec::new(),
-                encoder: split[1].to_string(),
-                args: split[4].split(' ').map(|s| s.to_owned()).collect(),
-                output_from_stdout: split[2]
-                    .parse::<u8>()
-                    .expect("wrong 'output_from_stdout' flag")
-                    .ne(&0),
-                output_extension: split[0].to_string(),
-                duration: core::time::Duration::new(0, 0),
+                encoder,
+                args: args.split(' ').map(|s| s.to_owned()).collect(),
+                output_from_stdout,
+                output_extension,
+                ..Default::default()
             }
         }
     }
@@ -307,38 +319,31 @@ impl ImageBuffer {
 
     fn match_preset(&mut self, preset: &str) {
         let output_extension: &'static str;
-        let encoder: &'static str;
         match preset {
-            "jpeg" => {
+            "cjpeg" => {
                 output_extension = "jpg";
-                encoder = "cjpeg";
                 self.output_from_stdout = true;
             }
             // TODO use image crate to convert into png
             "png" => {
                 output_extension = "png";
-                encoder = "convert";
             }
             "cjxl" => {
                 output_extension = "jxl";
-                encoder = "cjxl";
             }
-            "avif" => {
+            "avifenc" => {
                 output_extension = "avif";
-                encoder = "avifenc";
             }
             "cavif" => {
                 output_extension = "avif";
-                encoder = "cavif";
             }
             "cwebp" => {
                 output_extension = "webp";
-                encoder = "cwebp";
             }
             _ => panic!("match error, cmd '{}' not supported", &preset),
         }
-        self.output_extension = output_extension.into();
-        self.encoder = encoder.into();
+        self.output_extension = output_extension.to_string();
+        self.encoder = preset.to_string();
     }
 }
 
