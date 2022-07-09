@@ -105,22 +105,32 @@ ims-rs gen zip2video *.zip
 
 ## Image encoders comparison (`cmds`)
 
-Supports output to cli/csv
+Supports output to cli/csv  
+In commands in place of `:` use `\.`
 
 **Example:**
 
 ```bash
-ims-rs cmds --save --csv -c \
-    "avif:--min 0 --max 10" -c \
-    "cjxl:-d 1" -- ./1.png
+ims-rs cmds --csv -c \
+    "avifenc:--min 0 --max 63 -d 10 -s 6 -j 8 -a end-usage=q -a cq-level=16 -a color\.enable-chroma-deltaq=1" \
+    "cjxl:-d 1 --num_threads=0" \
+    "cjxl:-d 0 -j -m --num_threads=0" -- ./1.png
 ```
 
 **Example output:**
 
 ```bash
-avifenc --min 0 --max 10
-117.0KiB --> 10.0KiB      0.04bpp         0.59s         8%
-cjxl -d 1
-117.0KiB --> 10.8KiB      0.04bpp         1.32s         9%
+avifenc --min 0 --max 63 -d 10 -s 6 -j 8 -a end-usage=q -a cq-level=16 -a color:enable-chroma-deltaq=1
+992.1KiB --> 334.4KiB     0.42bpp       33% *     9.61s
+cjxl -d 1 --num_threads=0
+992.1KiB --> 1.1MiB       1.37bpp       109%      3.64s
+cjxl -d 0 -j -m --num_threads=0
+992.1KiB --> 630.9KiB     0.79bpp       63%       7.49s
+
+Save: avifenc --min 0 --max 63 -d 10 -s 6 -j 8 -a end-usage=q -a cq-level=16 -a color:enable-chroma-deltaq=1
+
+stats: 
+count    cmd
+1        avifenc --min 0 --max 63 -d 10 -s 6 -j 8 -a end-usage=q -a cq-level=16 -a color:enable-chroma-deltaq=1
 ```
 

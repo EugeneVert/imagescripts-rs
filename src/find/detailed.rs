@@ -1,4 +1,4 @@
-use std::{error::Error, path::PathBuf, ffi::OsString};
+use std::{error::Error, path::PathBuf};
 
 use clap::Parser;
 use image::{
@@ -8,9 +8,9 @@ use image::{
 };
 // use imageproc::definitions::Image;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[clap(about = "Program for finding images without clean lines")]
-struct Opt {
+pub struct Opt {
     /// input file
     #[clap(short)]
     input: PathBuf,
@@ -22,8 +22,7 @@ struct Opt {
     threshold: f32,
 }
 
-pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
-    let opt = Opt::parse_from(args);
+pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     let img = image::open(&opt.input)?;
 
     let mut img = img.to_luma8();

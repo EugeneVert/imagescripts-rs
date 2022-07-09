@@ -1,17 +1,12 @@
-use std::{
-    collections::HashMap,
-    error::Error,
-    ffi::{OsStr, OsString},
-    path::PathBuf,
-};
+use std::{collections::HashMap, error::Error, ffi::OsStr, path::PathBuf};
 
 use clap::{AppSettings, Parser};
 
 use crate::utils;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[structopt(setting = AppSettings::AllowHyphenValues)]
-struct Opt {
+pub struct Opt {
     /// input zip archive
     #[clap(display_order = 0)]
     input: PathBuf,
@@ -33,9 +28,7 @@ struct Opt {
     two_pass: Option<bool>,
 }
 
-pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
-    let opt = Opt::parse_from(args);
-
+pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     // extract zip to tempdir
     let zip_file = std::fs::File::open(&opt.input)?;
     let mut zip_archive = zip::ZipArchive::new(zip_file)?;

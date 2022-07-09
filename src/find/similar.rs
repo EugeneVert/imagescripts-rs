@@ -1,20 +1,19 @@
 use std::{
     collections::HashMap,
     error::Error,
-    ffi::OsString,
     path::{Path, PathBuf},
 };
 
 use clap::{AppSettings, Parser};
-use img_hash::{HashAlg, HasherConfig, ImageHash};
+use image_hasher::{HashAlg, HasherConfig, ImageHash};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::utils::{self, mkdir};
 
 #[rustfmt::skip]
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[clap(setting = AppSettings::AllowNegativeNumbers)]
-struct Opt {
+pub struct Opt {
     /// input image paths
     #[clap(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
@@ -30,9 +29,7 @@ struct Opt {
 
 }
 
-pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
-    let opt = Opt::parse_from(args);
-
+pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     let mut images = opt.input.to_owned();
     if images[0].to_string_lossy() == "./*" {
         utils::input_get_from_cwd(&mut images)?;
@@ -117,14 +114,10 @@ fn group_similar(res: &HashMap<PathBuf, ImageHash>, max_diff: u32) -> Vec<Vec<Pa
     groups
 }
 
-fn gen_hash(img: &Path, hasher: &img_hash::HasherConfig) -> Result<ImageHash, Box<dyn Error>> {
+fn gen_hash(img: &Path, hasher: &HasherConfig) -> Result<ImageHash, Box<dyn Error>> {
     let img = match img.extension().unwrap_or_default() {
-        x if x == "jxl" => {
-            image_jxl_decode(img).map(|t| image::open(t.path()))
-        },
-        x if x == "avif" => {
-            image_avif_decode(img).map(|t| image::open(t.path()))
-        },
+        x if x == "jxl" => image_jxl_decode(img).map(|t| image::open(t.path())),
+        x if x == "avif" => image_avif_decode(img).map(|t| image::open(t.path())),
         _ => Ok(image::open(img)),
     }??;
     Ok(hasher.to_hasher().hash_image(&img))

@@ -1,6 +1,5 @@
 use std::{
     error::Error,
-    ffi::OsString,
     path::{Path, PathBuf},
 };
 
@@ -9,8 +8,8 @@ use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use crate::utils;
 
-#[derive(Parser, Debug)]
-struct Opt {
+#[derive(Parser, Debug, Clone)]
+pub struct Opt {
     /// input image paths
     #[clap(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
@@ -27,11 +26,10 @@ struct Opt {
     nproc: usize,
 }
 
-pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
+pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     // if args.is_empty() {
     //     args = std::env::args_os().collect();
     // }
-    let opt = Opt::parse_from(args);
     let out_dir = std::path::PathBuf::from(unwrap_two(opt.lesser, opt.greater).to_string());
     let mut images = opt.input.to_owned();
     utils::ims_init(&mut images, &out_dir, Some(opt.nproc))?;

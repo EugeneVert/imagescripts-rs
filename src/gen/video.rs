@@ -2,7 +2,6 @@ use std::{
     cmp::Eq,
     collections::HashMap,
     error::Error,
-    ffi::OsString,
     hash::Hash,
     path::{Path, PathBuf},
 };
@@ -11,9 +10,9 @@ use clap::{AppSettings, Parser};
 
 use crate::utils;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[clap(setting = AppSettings::AllowHyphenValues)]
-struct Opt {
+pub struct Opt {
     /// input image paths
     #[clap(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
@@ -54,9 +53,7 @@ struct Opt {
     no_confirm: bool,
 }
 
-pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
-    let opt = Opt::parse_from(args);
-
+pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     let mut images = opt.input.to_owned();
     if images[0].to_string_lossy() == "./*" {
         utils::input_get_from_cwd(&mut images)?;

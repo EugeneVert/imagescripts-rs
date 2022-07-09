@@ -1,7 +1,6 @@
 use core::panic;
 use std::{
     error::Error,
-    ffi::OsString,
     path::{Path, PathBuf},
 };
 
@@ -12,9 +11,9 @@ use rayon::iter::{ParallelBridge, ParallelIterator};
 use crate::utils;
 
 #[rustfmt::skip]
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[clap(setting = AppSettings::AllowNegativeNumbers)]
-struct Opt {
+pub struct Opt {
     /// input image paths
     #[clap(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
@@ -33,9 +32,7 @@ struct Opt {
     test: bool,
 }
 
-pub fn main(args: Vec<OsString>) -> Result<(), Box<dyn Error>> {
-    let opt = Opt::parse_from(args);
-
+pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     let mut images = opt.input.to_owned();
     utils::ims_init(&mut images, opt.out_dir.as_path(), Some(opt.nproc))?;
 
@@ -67,11 +64,7 @@ fn image_is_monochrome(img: image::DynamicImage, threshold: f32, grayscale: bool
         // calculate thumbnail size
         let dim = img.dimensions();
         let dim = core::cmp::max(dim.0, dim.1);
-        let thumb_size = if dim < 2048 {
-            128
-        } else {
-            256
-        };
+        let thumb_size = if dim < 2048 { 128 } else { 256 };
         // resize image
         let thumb = image::imageops::resize(
             &img.into_rgb8(),
@@ -164,10 +157,7 @@ fn image_is_monochrome_by_MSE(
 
     for pixel in image.pixels() {
         let pixel_hsv = rgb2hsv(pixel);
-        if pixel_hsv[1] < 0.05
-            || pixel_hsv[1] > 0.99
-            || pixel_hsv[2] < 0.02
-        {
+        if pixel_hsv[1] < 0.05 || pixel_hsv[1] > 0.99 || pixel_hsv[2] < 0.02 {
             continue;
         }
         if grayscale {
