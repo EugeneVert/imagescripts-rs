@@ -1,7 +1,7 @@
 use clap::{IntoApp, StructOpt};
 use clap_complete::{generate, Shell};
 use ims_rs::*;
-use std::{error::Error, fs, io};
+use std::{error::Error, fs, io, env};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = args::Opt::parse();
@@ -20,13 +20,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             args::SelectableGen::Zip2video(opt) => gen::zip2video::main(opt)?,
         },
         args::Commands::Cmds(opt) => cmds::main(opt)?,
-        args::Commands::ShellCompletions => install_shell_completions()?,
+        args::Commands::ShellCompletions => gen_shell_completions()?,
     }
     Ok(())
 }
 
-fn install_shell_completions() -> io::Result<()> {
-    let p_zsh = dirs::home_dir().unwrap().join(".zsh/zfunctions/_ims-rs");
+fn gen_shell_completions() -> io::Result<()> {
+    let p_zsh = env::current_dir()?.join("_ims-rs");
     let mut f_zsh = fs::File::create(&p_zsh)?;
     generate(Shell::Zsh, &mut args::Opt::command(), "ims-rs", &mut f_zsh);
     println!("Zsh completions installed: {}", &p_zsh.display());
