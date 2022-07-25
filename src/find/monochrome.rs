@@ -48,7 +48,7 @@ fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(),
     // println!("File: {}", img.display());
     let img_image = image::open(&img)?;
 
-    if !image_is_monochrome(img_image, opt.threshold, opt.grayscale) {
+    if image_is_monochrome(img_image, opt.threshold, opt.grayscale) {
         if opt.test {
             return Ok(());
         }
@@ -72,9 +72,9 @@ fn image_is_monochrome(img: image::DynamicImage, threshold: f32, grayscale: bool
             thumb_size,
             image::imageops::Nearest,
         );
-        return !image_is_monochrome_by_MSE(&thumb, threshold, true, grayscale);
+        return image_is_monochrome_by_MSE(&thumb, threshold, true, grayscale);
     }
-    false
+    true
 }
 
 #[allow(clippy::float_cmp)] // '==' was not used on any calculated value

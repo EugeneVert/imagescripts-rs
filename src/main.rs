@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     match opt.subcommand {
         args::Commands::Find { subcommand } => match subcommand {
             args::SelectableFind::Bpp(opt) => find::bpp::main(opt)?,
-            args::SelectableFind::Monocrome(opt) => find::monochrome::main(opt)?,
+            args::SelectableFind::Monochrome(opt) => find::monochrome::main(opt)?,
             args::SelectableFind::Resizable(opt) => find::resizable::main(opt)?,
             args::SelectableFind::Similar(opt) => find::similar::main(opt)?,
             args::SelectableFind::Detailed(opt) => find::detailed::main(opt)?,

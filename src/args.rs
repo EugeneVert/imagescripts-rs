@@ -26,7 +26,7 @@ pub enum Commands {
 #[derive(Subcommand, Clone, Debug)]
 pub enum SelectableFind {
     Bpp(find::bpp::Opt),
-    Monocrome(find::monochrome::Opt),
+    Monochrome(find::monochrome::Opt),
     Resizable(find::resizable::Opt),
     Similar(find::similar::Opt),
     Detailed(find::detailed::Opt),
