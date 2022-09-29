@@ -1,12 +1,16 @@
 use std::{
     collections::HashMap,
     error::Error,
+    fs::File,
     path::{Path, PathBuf},
+    sync::{Arc, RwLock},
 };
 
 use clap::{AppSettings, Parser};
-use image_hasher::{HashAlg, HasherConfig, ImageHash};
+use image_hasher::{HashAlg, Hasher, HasherConfig, ImageHash};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
+use zip::write::FileOptions;
 
 use crate::utils::{self, mkdir};
 
@@ -17,16 +21,20 @@ pub struct Opt {
     /// input image paths
     #[clap(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
-    /// output directory path
-    // #[clap(short, required = false, default_value = "./monochrome", display_order = 0)]
-    // out_dir: PathBuf,
-    // /// max_diff
-    // #[clap(short, default_value = "12")]
-    // max_diff: u32,
+    /// save image hashes to zipped json file
+    #[clap(short)]
+    storage: Option<PathBuf>,
     /// no_move
     #[clap(short)]
-    no_move: bool
+    no_move: bool,
+    /// display using this command
+    display: Option<String>
 
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct JsonData {
+    map: HashMap<String, String>,
 }
 
 pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
@@ -36,26 +44,36 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
         utils::input_filter_images(&mut images);
     }
 
+    // Load saved hashes from zipped json
+    let mut map = Arc::new(RwLock::new(HashMap::<String, String>::new()));
+    load_map(&opt.storage, &mut map)?;
+
     let hasher = HasherConfig::new()
         .preproc_dct()
         .hash_alg(HashAlg::Mean)
-        .hash_size(16, 16);
+        .hash_size(16, 16)
+        .to_hasher();
+
+    // Process images
     let res: HashMap<PathBuf, ImageHash> = images
         .par_iter()
         .map(|img| {
             (
                 img.to_path_buf(),
-                gen_hash(img, &hasher)
+                gen_hash(img, map.clone(), &hasher)
                     .unwrap_or_else(|_| panic!("Error processing image: {}", &img.display())),
             )
         })
         .collect();
     println!("HashMap computed");
 
+    save_map(&opt.storage, map)?;
+
+    // Interactive diff selection
     let mut inp = String::new();
     let mut similar = Vec::new();
     println!("Select max_diff; 'n' to continue");
-    // TODO result groups thummbnails | Imagemagick montage?
+    // TODO result groups thumbnails | Imagemagick montage?
     while &inp != "n" {
         inp.clear();
         std::io::stdin().read_line(&mut inp)?;
@@ -67,6 +85,44 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
 
     if !opt.no_move {
         move_simmilar(similar)?;
+    }
+    Ok(())
+}
+
+fn load_map(
+    storage: &Option<PathBuf>,
+    map: &mut Arc<RwLock<HashMap<String, String>>>,
+) -> Result<(), Box<dyn Error>> {
+    if let Some(ref storage) = storage {
+        if storage.exists() {
+            let fr = File::open(storage)?;
+            let mut fz = zip::read::ZipArchive::new(fr)?;
+            let f = fz.by_name("data.json")?;
+            let data: JsonData = serde_json::from_reader(f)?;
+            *map = Arc::new(RwLock::new(data.map));
+        }
+    }
+    Ok(())
+}
+
+fn save_map(
+    storage: &Option<PathBuf>,
+    map: Arc<RwLock<HashMap<String, String>>>,
+) -> Result<(), Box<dyn Error>> {
+    if let Some(ref storage) = storage {
+        let fw = File::create(storage)?;
+        let mut fz = zip::write::ZipWriter::new(fw);
+        fz.start_file(
+            "data.json",
+            FileOptions::default().compression_level(Some(9)),
+        )?;
+        serde_json::to_writer_pretty(
+            fz,
+            &JsonData {
+                map: map.read().unwrap().to_owned(),
+            },
+        )
+        .unwrap();
     }
     Ok(())
 }
@@ -114,13 +170,34 @@ fn group_similar(res: &HashMap<PathBuf, ImageHash>, max_diff: u32) -> Vec<Vec<Pa
     groups
 }
 
-fn gen_hash(img: &Path, hasher: &HasherConfig) -> Result<ImageHash, Box<dyn Error>> {
-    let img = match img.extension().unwrap_or_default() {
-        x if x == "jxl" => image_jxl_decode(img).map(|t| image::open(t.path())),
-        x if x == "avif" => image_avif_decode(img).map(|t| image::open(t.path())),
-        _ => Ok(image::open(img)),
-    }??;
-    Ok(hasher.to_hasher().hash_image(&img))
+fn gen_hash(
+    img: &Path,
+    map: Arc<RwLock<HashMap<String, String>>>,
+    hasher: &Hasher,
+) -> Result<ImageHash, Box<dyn Error>> {
+    let hash: ImageHash;
+    let filename = img.file_name().unwrap().to_str().unwrap();
+
+    let r = map.read().unwrap();
+    let found = r.get(filename).map(|s| s.to_owned());
+    drop(r);
+
+    if let Some(h) = found {
+        hash = ImageHash::from_base64(&h).unwrap();
+    } else {
+        let img = match img.extension().unwrap_or_default() {
+            x if x == "jxl" => image_jxl_decode(img).map(|t| image::open(t.path())),
+            x if x == "avif" => image_avif_decode(img).map(|t| image::open(t.path())),
+            _ => Ok(image::open(img)),
+        }??;
+        let h = hasher.hash_image(&img);
+        map.write()
+            .unwrap()
+            .insert(filename.to_owned(), h.to_base64());
+        hash = h;
+    }
+
+    Ok(hash)
 }
 
 fn image_jxl_decode(i: &Path) -> Result<tempfile::NamedTempFile, Box<dyn Error>> {
