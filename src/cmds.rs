@@ -35,6 +35,8 @@ pub struct Opt {
     /// save all encoded images (Not only the best compressed one)
     #[clap(long = "save")]
     save_all: bool,
+    #[clap(long)]
+    no_progress: bool,
     /// save information to csv table
     #[clap(long = "csv")]
     csv_save: bool,
@@ -117,8 +119,10 @@ fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send +
             buff.image_generate(img).map(|_| buff)
         })
         .collect::<Result<_, _>>()?;
-
-    println!("{}", &img.display());
+    
+    if !opt.no_progress {
+        println!("{}", &img.display());
+    }
 
     // Caclculate & print info for each ImageBuffer
     for (i, buff) in enc_img_buffers.iter().enumerate() {
@@ -130,17 +134,19 @@ fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send +
             && (res_filesize == 0
                 || (res_filesize as i64 - buff_filesize as i64) > tolerance as i64);
 
-        let printing_status = format!(
-            "{}\n{} --> {}\t{:6.2}bpp\t{}% {is_better}\t{:>6.2}s",
-            &buff.get_cmd(),
-            byte2size(img_filesize as u64),
-            byte2size(buff_filesize as u64),
-            &buff_bpp,
-            percentage_of_original,
-            &buff.duration.as_secs_f32(),
-            is_better = if better { "* " } else { "" },
-        );
-        println!("{}", printing_status);
+        if !opt.no_progress {
+            let printing_status = format!(
+                "{}\n{} --> {}\t{:6.2}bpp\t{}% {is_better}\t{:>6.2}s",
+                &buff.get_cmd(),
+                byte2size(img_filesize as u64),
+                byte2size(buff_filesize as u64),
+                &buff_bpp,
+                percentage_of_original,
+                &buff.duration.as_secs_f32(),
+                is_better = if better { "* " } else { "" },
+            );
+            println!("{}", printing_status);
+        }
 
         if opt.csv_save {
             csv_row[2 + i] = buff_filesize.to_string();
@@ -170,7 +176,10 @@ fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send +
             res_filesize = buff_filesize;
         }
     }
-    println!();
+
+    if !opt.no_progress {
+        println!();
+    }
 
     if let Some(csv_output) = csv_output.as_mut() {
         csv_output.writer.write_record(&csv_row)?;
@@ -184,7 +193,9 @@ fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send +
     // save res_buf
     if res_filesize == img_filesize {
         std::fs::copy(img, out_dir.join(img.file_name().unwrap()))?;
-        println!("Save: Copy input");
+        if !opt.no_progress {
+            println!("Save: Copy input");
+        }
         return Ok("Copy input".into());
     }
 
@@ -198,7 +209,9 @@ fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send +
 
     let mut f = std::fs::File::create(save_path)?;
     f.write_all(&res_buff.image)?;
-    println!("Save: {}\n", &res_buff.get_cmd());
+    if !opt.no_progress {
+        println!("Save: {}\n", &res_buff.get_cmd());
+    }
 
     Ok(res_buff.get_cmd())
 }
