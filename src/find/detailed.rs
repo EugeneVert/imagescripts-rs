@@ -1,6 +1,6 @@
 use std::{error::Error, path::PathBuf};
 
-use clap::Parser;
+use clap::Args;
 use image::{
     ImageBuffer,
     // ImageResult,
@@ -8,17 +8,17 @@ use image::{
 };
 // use imageproc::definitions::Image;
 
-#[derive(Parser, Debug, Clone)]
-#[clap(about = "Program for finding images without clean lines")]
+#[derive(Args, Debug, Clone)]
+#[command(about = "Program for finding images without clean lines")]
 pub struct Opt {
     /// input file
-    #[clap(short)]
+    #[arg(short)]
     input: PathBuf,
     /// mv dir
-    #[clap(short)]
+    #[arg(short)]
     output: Option<PathBuf>,
     /// threshold to mv
-    #[clap(short, default_value = "3.25")]
+    #[arg(short, default_value = "3.25")]
     threshold: f32,
 }
 

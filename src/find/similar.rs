@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use clap::{AppSettings, Parser};
+use clap::Args;
 use image_hasher::{HashAlg, Hasher, HasherConfig, ImageHash};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
@@ -15,17 +15,16 @@ use zip::write::FileOptions;
 use crate::utils::{self, mkdir};
 
 #[rustfmt::skip]
-#[derive(Parser, Debug, Clone)]
-#[clap(setting = AppSettings::AllowNegativeNumbers)]
+#[derive(Args, Debug, Clone)]
 pub struct Opt {
     /// input image paths
-    #[clap(required = false, default_value = "./*", display_order = 0)]
+    #[arg(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
     /// save image hashes to zipped json file
-    #[clap(short)]
+    #[arg(short)]
     storage: Option<PathBuf>,
     /// no_move
-    #[clap(short)]
+    #[arg(short)]
     no_move: bool,
     /// display using this command
     display: Option<String>

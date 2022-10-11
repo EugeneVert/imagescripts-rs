@@ -4,24 +4,24 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::Parser;
+use clap::Args;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use crate::utils;
 
 #[rustfmt::skip]
-#[derive(Parser, Debug, Clone)]
+#[derive(Args, Debug, Clone)]
 pub struct Opt {
     /// input image paths
-    #[clap(required = false, default_value = "./*", display_order = 0)]
+    #[arg(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
     /// search target
-    #[clap(short = 's', long = "size", required = false, default_value = "3508", display_order = 0)]
+    #[arg(short = 's', long = "size", required = false, default_value = "3508", display_order = 0)]
     px_size: u32,
     /// keep empty folder after sorting
-    #[clap(long)]
+    #[arg(long)]
     keep_empty: bool,
-    #[clap(long, default_value = "0")]
+    #[arg(long, default_value = "0")]
     nproc: usize,
 }
 

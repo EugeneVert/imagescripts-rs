@@ -1,7 +1,7 @@
-use clap::{IntoApp, StructOpt};
+use clap::{CommandFactory, Parser};
 use clap_complete::{generate, Shell};
 use ims_rs::*;
-use std::{error::Error, fs, io, env};
+use std::{env, error::Error, fs, io};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = args::Opt::parse();
@@ -30,9 +30,6 @@ fn gen_shell_completions() -> io::Result<()> {
     let mut f_zsh = fs::File::create(&p_zsh)?;
     generate(Shell::Zsh, &mut args::Opt::command(), "ims-rs", &mut f_zsh);
     println!("Zsh completions installed: {}", &p_zsh.display());
-    // let mut f_bash = fs::File::create(
-    //     dirs::home_dir().join(".local/share/bash-completion/completions/pixiv-scripts"),
-    // )?;
     // generate(Shell::Bash, &mut Opt::command(), "pixiv-scripts", &mut f_bash);
     Ok(())
 }

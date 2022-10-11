@@ -1,30 +1,29 @@
 use std::{collections::HashMap, error::Error, ffi::OsStr, path::PathBuf};
 
-use clap::{AppSettings, Parser};
+use clap::Args;
 
 use crate::utils;
 
-#[derive(Parser, Debug, Clone)]
-#[structopt(setting = AppSettings::AllowHyphenValues)]
+#[derive(Args, Debug, Clone)]
 pub struct Opt {
     /// input zip archive
-    #[clap(display_order = 0)]
+    #[arg(display_order = 0)]
     input: PathBuf,
 
     /// ffmpeg arguments (or preset name {n} ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] ) {n}
-    #[clap(short, long = "ffmpeg", default_value = "x264")]
+    #[arg(short, long = "ffmpeg", default_value = "x264")]
     ffmpeg_args: String,
     /// crf / qscale for preset
-    #[clap(short = 'q', default_value = "17")]
+    #[arg(short = 'q', default_value = "17")]
     preset_quality: f32,
     /// video container
-    #[clap(short, long = "container")]
+    #[arg(short, long = "container")]
     container: Option<String>,
     /// force overwrite existing file
-    #[clap(short = 'y')]
+    #[arg(short = 'y')]
     overwrite: bool,
     ///
-    #[clap(long)]
+    #[arg(long)]
     two_pass: Option<bool>,
 }
 

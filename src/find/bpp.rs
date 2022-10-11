@@ -3,26 +3,26 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::Parser;
+use clap::Args;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use crate::utils;
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Args, Debug, Clone)]
 pub struct Opt {
     /// input image paths
-    #[clap(required = false, default_value = "./*", display_order = 0)]
+    #[arg(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
     /// sort images w/ bpp greater than the target
-    #[clap(short, conflicts_with = "greater")]
+    #[arg(short, conflicts_with = "greater")]
     lesser: Option<f32>,
     /// sort images w/ bpp less than the target
-    #[clap(short, conflicts_with = "lesser")]
+    #[arg(short, conflicts_with = "lesser")]
     greater: Option<f32>,
     /// Custom metric: bpp + px_count / 2048^2
-    #[clap(short = 'm')]
+    #[arg(short = 'm')]
     custom_metric: bool,
-    #[clap(long, default_value = "0")]
+    #[arg(long, default_value = "0")]
     nproc: usize,
 }
 

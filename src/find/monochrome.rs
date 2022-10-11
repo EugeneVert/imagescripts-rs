@@ -4,31 +4,30 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::{AppSettings, Parser};
+use clap::Args;
 use image::{GenericImageView, Rgb};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use crate::utils;
 
 #[rustfmt::skip]
-#[derive(Parser, Debug, Clone)]
-#[clap(setting = AppSettings::AllowNegativeNumbers)]
+#[derive(Args, Debug, Clone)]
 pub struct Opt {
     /// input image paths
-    #[clap(required = false, default_value = "./*", display_order = 0)]
+    #[arg(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
     /// output directory path
-    #[clap(short, required = false, default_value = "./monochrome", display_order = 0)]
+    #[arg(short, required = false, default_value = "./monochrome", display_order = 0)]
     out_dir: PathBuf,
     /// MSE cutoff
-    #[clap(short, default_value = "0.8")]
+    #[arg(short, default_value = "0.8")]
     threshold: f32,
-    #[clap(long, default_value = "0")]
+    #[arg(long, default_value = "0")]
     nproc: usize,
-    #[clap(short)]
+    #[arg(short)]
     grayscale: bool,
     /// Don't move images
-    #[clap(short = 's')]
+    #[arg(short = 's')]
     test: bool,
 }
 

@@ -6,50 +6,49 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::{AppSettings, Parser};
+use clap::Args;
 
 use crate::utils;
 
-#[derive(Parser, Debug, Clone)]
-#[clap(setting = AppSettings::AllowHyphenValues)]
+#[derive(Args, Debug, Clone)]
 pub struct Opt {
     /// input image paths
-    #[clap(required = false, default_value = "./*", display_order = 0)]
+    #[arg(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
 
     /// video dimensions (e.g: '128x128')
-    #[clap(short = 'd')]
+    #[arg(short = 'd')]
     dimensions: Option<String>,
     /// video background for resized images
-    #[clap(long = "bg", default_value = "Black")]
+    #[arg(long = "bg", default_value = "Black")]
     background: String,
 
     /// ffmpeg arguments (or preset name {n} ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] ) {n}
-    #[clap(short, long = "ffmpeg", default_value = "x264")]
+    #[arg(short, long = "ffmpeg", default_value = "x264")]
     ffmpeg_args: String,
     /// crf / qscale for preset
-    #[clap(short = 'q', default_value = "17")]
+    #[arg(short = 'q', default_value = "17")]
     preset_quality: f32,
     /// video container
-    #[clap(short, long = "container")]
+    #[arg(short, long = "container")]
     container: Option<String>,
     /// video fps
-    #[clap(short = 'r', default_value = "4")]
+    #[arg(short = 'r', default_value = "4")]
     fps: f32,
     /// two-pass video encoding
-    #[clap(long)]
+    #[arg(long)]
     two_pass: Option<bool>,
     /// generate video thumbnail
-    #[clap(short = 't', long = "thumb")]
+    #[arg(short = 't', long = "thumb")]
     create_thumbnail: bool,
     /// amount of thumbnail sheets
-    #[clap(short = 's', long = "sheet_count", default_value = "2")]
+    #[arg(short = 's', long = "sheet_count", default_value = "2")]
     thumbnail_sheets: usize,
     /// thumbnail sheet size
-    #[clap(long = "sheet_size", default_value = "2x2")]
+    #[arg(long = "sheet_size", default_value = "2x2")]
     thumbnail_size: String,
     /// Don't ask for resize confirmation
-    #[clap(short = 'n', long = "no_confirm")]
+    #[arg(short = 'n', long = "no_confirm")]
     no_confirm: bool,
 }
 
@@ -171,7 +170,7 @@ fn generate_thumbnail(
             &tmpdir.path().display(),
             &tmpdir.path().read_dir().unwrap().count()
         ))
-        .arg(format!("{}.jpg", &video_filename))
+        .arg(format!("{}.png", &video_filename))
         .status()?;
     tmpdir.close()?;
 

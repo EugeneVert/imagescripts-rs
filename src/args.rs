@@ -3,20 +3,20 @@ use clap::{Parser, Subcommand};
 use crate::*;
 
 #[derive(Parser, Clone, Debug)]
-#[clap(disable_help_subcommand(true))]
+#[group(disable_help_subcommand(true))]
 pub struct Opt {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub subcommand: Commands,
 }
 
 #[derive(Subcommand, Clone, Debug)]
 pub enum Commands {
     Find {
-        #[clap(subcommand)]
+        #[command(subcommand)]
         subcommand: SelectableFind,
     },
     Gen {
-        #[clap(subcommand)]
+        #[command(subcommand)]
         subcommand: SelectableGen,
     },
     Cmds(cmds::Opt),

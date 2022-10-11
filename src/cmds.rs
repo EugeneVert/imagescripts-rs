@@ -7,6 +7,7 @@ use std::{
     sync::RwLock,
 };
 
+use clap::Args;
 use clap::Parser;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -14,12 +15,12 @@ use crate::{csv_output, utils};
 
 type BytesIO = Vec<u8>;
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Args, Debug, Clone)]
 pub struct Opt {
     /// input image paths
-    #[clap(default_value = "./*", display_order = 0)]
+    #[arg(default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
-    #[clap(short, default_value = "./out")]
+    #[arg(short, default_value = "./out")]
     out_dir: PathBuf,
     /// {preset}:{args} {n}
     /// avaible presets:    {n}
@@ -27,27 +28,28 @@ pub struct Opt {
     /// custom cmd format:  {n}
     /// "{extension}:{encoder}[>(if output to stdout)]:{args}"
     #[clap(short, multiple_values(true))]
+    #[arg(short, num_args = 1..)]
     cmds: Vec<String>,
     /// (KiB) tolerance of commands to the following ones{n}
     /// {n} (when not saving all results)
-    #[clap(short, long, default_value = "100")]
+    #[arg(short, long, default_value = "100", allow_negative_numbers = true)]
     tolerance: usize,
     /// save all encoded images (Not only the best compressed one)
-    #[clap(long = "save")]
+    #[arg(long = "save")]
     save_all: bool,
-    #[clap(long)]
+    #[arg(long)]
     no_progress: bool,
     /// save information to csv table
-    #[clap(long = "csv")]
+    #[arg(long = "csv")]
     csv_save: bool,
     /// path for csv table
-    #[clap(long = "csv_path", default_value = "./res.csv")]
+    #[arg(long = "csv_path", default_value = "./res.csv")]
     csv_path: PathBuf,
     /// number simultaneously processed images
-    #[clap(long, default_value = "1")]
+    #[arg(long, default_value = "1")]
     nproc: usize,
     /// number simultaneously executed cmds for each image
-    #[clap(long)]
+    #[arg(long)]
     nproc_cmd: Option<usize>,
 }
 

@@ -3,14 +3,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::Parser;
+use clap::Args;
 
 use crate::utils;
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Args, Debug, Clone)]
 pub struct Opt {
     /// input image paths
-    #[clap(required = false, default_value = "./*", display_order = 0)]
+    #[arg(required = false, default_value = "./*", display_order = 0)]
     input: Vec<PathBuf>,
 }
 
