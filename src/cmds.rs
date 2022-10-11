@@ -2,14 +2,15 @@ use std::{
     collections::HashMap,
     error::Error,
     ffi::OsStr,
+    fs::File,
     io::Write,
     path::{Path, PathBuf},
     sync::RwLock,
 };
 
 use clap::Args;
-use clap::Parser;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
 
 use crate::{csv_output, utils};
 
@@ -22,14 +23,12 @@ pub struct Opt {
     input: Vec<PathBuf>,
     #[arg(short, default_value = "./out")]
     out_dir: PathBuf,
-    /// {preset}:{args} {n}
-    /// avaible presets:    {n}
-    /// cjxl, avifenc, cafiv, cjpeg, cwebp, png {n}
-    /// custom cmd format:  {n}
-    /// "{extension}:{encoder}[>(if output to stdout)]:{args}"
-    #[clap(short, multiple_values(true))]
+    /// Commands from json config
     #[arg(short, num_args = 1..)]
     cmds: Vec<String>,
+    /// Path to json file with cmds config
+    #[arg(long)]
+    cmds_config_json: Option<PathBuf>,
     /// (KiB) tolerance of commands to the following ones{n}
     /// {n} (when not saving all results)
     #[arg(short, long, default_value = "100", allow_negative_numbers = true)]
@@ -67,6 +66,11 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
         csv_output.write_cmds_header(&opt.cmds)?;
     }
 
+    let settings = match &opt.cmds_config_json {
+        None => settings_load(&dirs::config_dir().unwrap().join("vert/cmds_settings.json")),
+        Some(x) => settings_load(x),
+    }?;
+
     let resultmap = RwLock::new(HashMap::<String, usize>::new());
     let threadpool = rayon::ThreadPoolBuilder::new()
         .num_threads(opt.nproc)
@@ -74,13 +78,13 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     threadpool.install(|| {
         images
             .par_iter()
-            .for_each(|image| match process_image(image, &opt) {
+            .for_each(|image| match process_image(image, &opt, &settings) {
                 Ok(res) => *resultmap.write().unwrap().entry(res).or_default() += 1,
                 Err(e) => println!("Can't process image {}: {}", &image.display(), &e),
             })
     });
 
-    println!("stats: \ncount\t cmd");
+    println!("\nstats: \ncount\t cmd");
     resultmap
         .read()
         .unwrap()
@@ -91,7 +95,11 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
 }
 
 /// Generate results from cmds and compare/save/output them
-fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send + Sync>> {
+fn process_image(
+    img: &Path,
+    opt: &Opt,
+    settings: &HashMap<String, EncodeSetting>,
+) -> Result<String, Box<dyn Error + Send + Sync>> {
     let img_filesize = img.metadata()?.len() as usize;
     let img_dimensions = image::image_dimensions(&img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
@@ -111,17 +119,18 @@ fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send +
     };
 
     let mut res_filesize: usize = 0;
+
     let mut res_buff = &ImageBuffer::default();
     // generate results in ImageBuffers for each cmd
     let enc_img_buffers: Vec<ImageBuffer> = opt
         .cmds
         .par_iter()
         .map(|cmd| {
-            let mut buff = ImageBuffer::new(cmd);
+            let mut buff = ImageBuffer::new(cmd, settings);
             buff.image_generate(img).map(|_| buff)
         })
         .collect::<Result<_, _>>()?;
-    
+
     if !opt.no_progress {
         println!("{}", &img.display());
     }
@@ -166,7 +175,7 @@ fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send +
                     .and_then(OsStr::to_str)
                     .unwrap_or_else(|| panic!("No filestem: {}", img.display())),
                 i,
-                &buff.output_extension
+                &buff.extension
             ));
             let mut f = std::fs::File::create(save_path)?;
             f.write_all(&buff.image)?;
@@ -177,10 +186,6 @@ fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send +
             res_buff = buff;
             res_filesize = buff_filesize;
         }
-    }
-
-    if !opt.no_progress {
-        println!();
     }
 
     if let Some(csv_output) = csv_output.as_mut() {
@@ -206,14 +211,15 @@ fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send +
         img.file_stem()
             .and_then(OsStr::to_str)
             .ok_or_else(|| format!("No filestem: {}", img.display()))?,
-        &res_buff.output_extension
+        &res_buff.extension
     ));
 
     let mut f = std::fs::File::create(save_path)?;
     f.write_all(&res_buff.image)?;
-    if !opt.no_progress {
-        println!("Save: {}\n", &res_buff.get_cmd());
-    }
+    // if !opt.no_progress {
+    //     println!("Save: {}", &res_buff.get_cmd());
+    // }
+    println!();
 
     Ok(res_buff.get_cmd())
 }
@@ -221,87 +227,44 @@ fn process_image(img: &Path, opt: &Opt) -> Result<String, Box<dyn Error + Send +
 #[derive(Default, Debug, Clone)]
 struct ImageBuffer {
     image: BytesIO,
-    /// Encoder command (e.g. `cjxl`)
+    /// Encoder command
     encoder: String,
-    /// Encoder arguments
-    args: Vec<String>,
     /// Get image [from stdout | temporary file]
     output_from_stdout: bool,
     /// Result image file extension (suffix)
-    output_extension: String,
+    extension: String,
     /// execution time
     duration: core::time::Duration,
 }
 
 impl ImageBuffer {
-    fn new(cmd: &str) -> ImageBuffer {
-        let split_indexes = cmd.match_indices(':').map(|m| m.0).collect::<Vec<usize>>();
-        let preset = match split_indexes.len() {
-            1 => true,
-            2 => false,
-            _ => panic!("Error parsing cmd {}", &cmd),
+    fn new(cmd: &str, settings: &HashMap<String, EncodeSetting>) -> ImageBuffer {
+        let (name, args) = match cmd.split_once('(') {
+            Some(s) => s,
+            None => (cmd, " "),
         };
-        // let preset = !cmd.contains(">:");
-        if preset {
-            let (encoder, args) = (
-                cmd[..split_indexes[0]].to_owned(),
-                cmd[split_indexes[0] + 1..].to_owned(),
-            );
-            let mut ib = ImageBuffer {
-                encoder: encoder.to_owned(),
-                args: args
-                    .replace("\\.", ":")
-                    .split(' ')
-                    .map(|s| s.to_owned())
-                    .collect(),
-                ..Default::default()
-            };
-            ib.match_preset(&encoder);
-            ib
-        } else {
-            let (output_extension, mut encoder, args) = (
-                cmd[..split_indexes[0]].to_owned(),
-                cmd[split_indexes[0] + 1..split_indexes[1]].to_owned(),
-                cmd[split_indexes[1] + 1..].to_owned(),
-            );
+        let args: Vec<&str> = (args[..args.len() - 1]).split(',').collect();
 
-            let output_from_stdout = encoder.ends_with('>');
-            if output_from_stdout {
-                encoder.pop();
-            };
+        let mut cmd = settings.get(name).unwrap().clone();
 
-            ImageBuffer {
-                encoder,
-                args: args
-                    .replace("\\.", ":")
-                    .split(' ')
-                    .map(|s| s.to_owned())
-                    .collect(),
-                output_from_stdout,
-                output_extension,
-                ..Default::default()
-            }
+        for (i, v) in args.iter().enumerate() {
+            cmd.encode = cmd.encode.replace(&format!("%{}%", i + 1), v);
+        }
+
+        ImageBuffer {
+            encoder: cmd.encode,
+            extension: cmd.ext,
+            output_from_stdout: cmd.output_from_stdout.is_some(),
+            ..Default::default()
         }
     }
-
-    // fn new_empty() -> Self {
-    //     ImageBuffer {
-    //         image: Vec::new(),
-    //         cmd: "",
-    //         encoder: String::new(),
-    //         args: Vec::new(),
-    //         output_from_stdout: false,
-    //         output_extension: String::new(),
-    //         duration: core::time::Duration::new(0, 0),
-    //     }
-    // }
 
     fn get_size(&self) -> usize {
         core::mem::size_of_val(&self.image[..])
     }
 
     fn get_cmd(&self) -> String {
-        self.encoder.to_string() + " " + &self.args.join(" ")
+        self.encoder.to_string()
     }
 
     fn image_generate(&mut self, img_path: &Path) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -312,24 +275,22 @@ impl ImageBuffer {
     }
 
     fn gen_from_cmd(&mut self, img_path: &Path) -> std::io::Result<()> {
-        // no arguments -> return None
-        if self.args.contains(&"".into()) {
-            self.args.pop();
-        }
+        let mut split = self.encoder.split_whitespace();
+        let encoder = split.next().ok_or(std::io::ErrorKind::InvalidData)?;
 
         if self.output_from_stdout {
-            let output = std::process::Command::new(&self.encoder)
-                .args(&self.args)
+            let output = std::process::Command::new(encoder)
+                .args(split)
                 .arg(img_path)
                 .output()?;
             self.image = output.stdout;
         } else {
             let buffer = tempfile::Builder::new()
-                .suffix(&format!(".{}", self.output_extension))
+                .suffix(&format!(".{}", self.extension))
                 .tempfile()?;
-            let outp = std::process::Command::new(&self.encoder)
+            let outp = std::process::Command::new(encoder)
                 .arg(img_path)
-                .args(&self.args)
+                .args(split)
                 .arg(buffer.path())
                 .output()?;
             command_print_if_error(&outp)?;
@@ -338,35 +299,6 @@ impl ImageBuffer {
             // println!("{}", std::str::from_utf8(&output.stderr).unwrap());
         }
         Ok(())
-    }
-
-    fn match_preset(&mut self, preset: &str) {
-        let output_extension: &'static str;
-        match preset {
-            "cjpeg" => {
-                output_extension = "jpg";
-                self.output_from_stdout = true;
-            }
-            // TODO use image crate to convert into png
-            "png" => {
-                output_extension = "png";
-            }
-            "cjxl" => {
-                output_extension = "jxl";
-            }
-            "avifenc" => {
-                output_extension = "avif";
-            }
-            "cavif" => {
-                output_extension = "avif";
-            }
-            "cwebp" => {
-                output_extension = "webp";
-            }
-            _ => panic!("match error, cmd '{}' not supported", &preset),
-        }
-        self.output_extension = output_extension.to_string();
-        self.encoder = preset.to_string();
     }
 }
 
@@ -391,5 +323,45 @@ fn byte2size(num: u64) -> String {
         }
         num_f /= 1024.0;
     }
-    return format!("{:3.1}TiB", num_f);
+    format!("{:3.1}TiB", num_f)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct EncodeSetting {
+    encode: String,
+    ext: String,
+    output_from_stdout: Option<()>,
+}
+
+fn settings_load(file: &Path) -> Result<HashMap<String, EncodeSetting>, Box<dyn Error>> {
+    if !file.exists() {
+        let mut writer = File::create(&file)?;
+        writer.write_all(
+r#"{
+  "cjxl_d": {
+    "encode": "cjxl -d %1% -j 0 --patches=0",
+    "ext": "jxl"
+  },
+  "cjxl_l": {
+    "encode": "cjxl -d 0 -j 0 -e %1% --patches=0",
+    "ext": "jxl"
+  },
+  "cjxl_tr": {
+    "encode": "cjxl -d 0 -j 1 -e %1%",
+    "ext": "jxl"
+  },
+  "cavif_q": {
+    "encode": "cavif -Q %1%",
+    "ext": "avif"
+  },
+  "avif_q": {
+    "encode": "avifenc --min 0 --max 63 -d 10 -s 4 -j 8 -a end-usage=q -a cq-level=%1% -a color:enable-chroma-deltaq=1 -a color:deltaq-mode=3 -a color:aq-mode=1 -a color:qm-min=0 -a tune=ssim",
+    "ext": "avif"
+  }
+}"#.as_bytes()
+        )?;
+    }
+    let reader = File::open(file)?;
+    let json: HashMap<String, EncodeSetting> = serde_json::from_reader(reader)?;
+    Ok(json)
 }
