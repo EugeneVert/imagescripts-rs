@@ -2,7 +2,7 @@ use std::{collections::HashMap, error::Error, ffi::OsStr, path::PathBuf};
 
 use clap::Args;
 
-use crate::utils;
+use super::{ffmpeg_demuxer_create_from_json, ffmpeg_run, VideoOpts};
 
 #[derive(Args, Debug, Clone)]
 pub struct Opt {
@@ -43,11 +43,17 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
         }
     };
     // create options for encding video
-    let mut videoopts = utils::VideoOpts::new(&dirs::config_dir().unwrap().join("vert/video_presets.json"))?;
-    videoopts.args_match(&opt.ffmpeg_args, &opt.container, &opt.two_pass, opt.preset_quality);
+    let mut videoopts =
+        VideoOpts::new(&dirs::config_dir().unwrap().join("vert/video_presets.json"))?;
+    videoopts.args_match(
+        &opt.ffmpeg_args,
+        &opt.container,
+        &opt.two_pass,
+        opt.preset_quality,
+    );
 
     let demuxerf_path = tempdir.path().join("concat_demuxer");
-    utils::ffmpeg_demuxer_create_from_json(&demuxerf_path, &json_mux)?;
+    ffmpeg_demuxer_create_from_json(&demuxerf_path, &json_mux)?;
     let mut ffmpeg_cmd = format!(
         "-f concat -i {} {} \
         -vf pad=ceil(iw/2)*2:ceil(ih/2)*2'",
@@ -62,7 +68,12 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
         .file_stem()
         .and_then(OsStr::to_str)
         .ok_or_else(|| format!("No filestem; {}", &opt.input.display()))?;
-    utils::ffmpeg_run(&ffmpeg_cmd, filestem, videoopts.two_pass, &videoopts.container);
+    ffmpeg_run(
+        &ffmpeg_cmd,
+        filestem,
+        videoopts.two_pass,
+        &videoopts.container,
+    );
 
     Ok(())
 }

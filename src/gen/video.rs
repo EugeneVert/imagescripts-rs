@@ -3,12 +3,15 @@ use std::{
     collections::HashMap,
     error::Error,
     hash::Hash,
+    io::BufRead,
     path::{Path, PathBuf},
 };
 
 use clap::Args;
 
 use crate::utils;
+
+use super::{ffmpeg_demuxer_create_from_files, ffmpeg_run, VideoOpts};
 
 #[derive(Args, Debug, Clone)]
 pub struct Opt {
@@ -24,7 +27,12 @@ pub struct Opt {
     background: String,
 
     /// ffmpeg arguments (or preset name {n} ["x264", "x265", "apng", "vp9", "aom-av1", "aom-av1-simple"] ) {n}
-    #[arg(short, long = "ffmpeg", default_value = "x264")]
+    #[arg(
+        short,
+        long = "ffmpeg",
+        default_value = "x264",
+        allow_hyphen_values = true
+    )]
     ffmpeg_args: String,
     /// crf / qscale for preset
     #[arg(short = 'q', default_value = "17")]
@@ -50,6 +58,8 @@ pub struct Opt {
     /// Don't ask for resize confirmation
     #[arg(short = 'n', long = "no_confirm")]
     no_confirm: bool,
+    #[arg(long = "round")]
+    round: bool,
 }
 
 pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
@@ -66,15 +76,21 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     });
     let dimm = match dimm {
         Some(x) => x,
-        None => get_video_dimm_from_images(&images, opt.no_confirm)
+        None => get_video_dimm_from_images(&images, opt.no_confirm, opt.round)
             .expect("Can't calculate frequent image dimms"),
     };
 
-    let mut videoopts = utils::VideoOpts::new(&dirs::config_dir().unwrap().join("vert/video_presets.json"))?;
-    videoopts.args_match(&opt.ffmpeg_args, &opt.container, &opt.two_pass, opt.preset_quality);
+    let mut videoopts =
+        VideoOpts::new(&dirs::config_dir().unwrap().join("vert/video_presets.json"))?;
+    videoopts.args_match(
+        &opt.ffmpeg_args,
+        &opt.container,
+        &opt.two_pass,
+        opt.preset_quality,
+    );
 
     let demuxerf_path = Path::new("./concat_demuxer");
-    utils::ffmpeg_demuxer_create_from_files(demuxerf_path, &images)?;
+    ffmpeg_demuxer_create_from_files(demuxerf_path, &images)?;
 
     let ffmpeg_cmd = format!(
         "-r {fps} -safe 0 -f concat -i {demuxer_path} {0} \
@@ -92,7 +108,12 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
         .file_stem()
         .and_then(|x| x.to_str())
         .ok_or_else(|| format!("No filestem: {}", images[0].display()))?;
-    utils::ffmpeg_run(&ffmpeg_cmd, output_filestem, videoopts.two_pass, &videoopts.container);
+    ffmpeg_run(
+        &ffmpeg_cmd,
+        output_filestem,
+        videoopts.two_pass,
+        &videoopts.container,
+    );
 
     if opt.create_thumbnail {
         let video_filename = format!("{}.{}", &output_filestem, &videoopts.container);
@@ -130,7 +151,7 @@ fn generate_thumbnail(
         .arg("-vf")
         .arg(format!(
             "                                                             \
-            scale=254:254,                                                 \
+            scale=254:254,                                                \
             drawtext=fontfile=/usr/share/fonts/noto/NotoSans-Regular.ttf: \
             fontsize=14:start_number=1:text='%{n}':x=(w-tw)/2:y=h-(2*lh): \
             fontcolor=white:                                              \
@@ -175,21 +196,36 @@ fn generate_thumbnail(
 }
 
 /// Get most frequent width & hight from images
-fn get_video_dimm_from_images(images: &[PathBuf], no_confirm: bool) -> Option<(u32, u32)> {
+fn get_video_dimm_from_images(
+    images: &[PathBuf],
+    no_confirm: bool,
+    round: bool,
+) -> Option<(u32, u32)> {
     let mut images_w = Vec::<u32>::new();
     let mut images_h = Vec::<u32>::new();
     images
         .iter()
         .map(|i| {
             image::image_dimensions(i)
+                .or_else(|_| image_dimmesions_exiftool(i))
                 .unwrap_or_else(|e| panic!("Can't read image dimensions: {}; {}", &i.display(), &e))
         })
         .for_each(|d| {
             images_w.push(d.0);
             images_h.push(d.1);
         });
-    let w = most_frequent(&images_w)?;
-    let h = most_frequent(&images_h)?;
+    let mut w = most_frequent(&images_w)?;
+    let mut h = most_frequent(&images_h)?;
+
+    if round {
+        if w % 2 == 1 {
+            w = (w / 2) * 2 + 2;
+        }
+        if h % 2 == 1 {
+            h = (h / 2) * 2 + 2;
+        }
+    }
+
     println!("{:?}x{:?}", &w, &h);
 
     // find and print image paths whose sizes differs from the most frequent ones
@@ -211,6 +247,17 @@ fn get_video_dimm_from_images(images: &[PathBuf], no_confirm: bool) -> Option<(u
     }
 
     Some((w, h))
+}
+
+fn image_dimmesions_exiftool(image: &Path) -> Result<(u32, u32), Box<dyn Error>> {
+    let output = std::process::Command::new("exiftool")
+        .args(["-s3", "-ImageWidth", "-ImageHeight"])
+        .arg(image)
+        .output()?;
+    let mut lines = output.stdout.lines().map(|l| l.unwrap());
+    let width = lines.next().unwrap_or_default().parse()?;
+    let height = lines.next().unwrap_or_default().parse()?;
+    Ok((width, height))
 }
 
 fn most_frequent<T>(iter: &[T]) -> Option<T>

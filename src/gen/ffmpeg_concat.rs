@@ -7,6 +7,8 @@ use clap::Args;
 
 use crate::utils;
 
+use super::ffmpeg_demuxer_create_from_files;
+
 #[derive(Args, Debug, Clone)]
 pub struct Opt {
     /// input image paths
@@ -21,6 +23,6 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
         utils::input_filter_images(&mut images);
     }
     let demuxerf_path = Path::new("./concat_demuxer");
-    utils::ffmpeg_demuxer_create_from_files(demuxerf_path, &images)?;
+    ffmpeg_demuxer_create_from_files(demuxerf_path, &images)?;
     Ok(())
 }

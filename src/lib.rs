@@ -5,13 +5,9 @@ pub mod find {
     pub mod resizable;
     pub mod similar;
 }
-pub mod gen {
-    pub mod ffmpeg_concat;
-    pub mod video;
-    pub mod zip2video;
-}
 pub mod cmds;
 pub mod csv_output;
+pub mod gen;
 pub mod utils;
 
 pub mod args;
