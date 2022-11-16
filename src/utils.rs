@@ -1,8 +1,13 @@
 use std::{
+    collections::HashMap,
     error::Error,
+    fs::File,
     io::Write,
+    ops::Deref,
     path::{Path, PathBuf},
 };
+
+use serde::Deserialize;
 
 pub fn ims_init(
     input: &mut Vec<PathBuf>,
@@ -70,111 +75,134 @@ pub fn input_filter_images(input: &mut Vec<PathBuf>) {
     });
 }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct VideoEncodeSettings {
+    container: Option<String>,
+    two_pass: Option<bool>,
+    quality_slider: Option<String>,
+    args: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct VideoOpts {
-    args: String,
-    pub container: Option<String>,
-    pub ffmpeg_args: String,
-    pub two_pass: Option<bool>,
+    pub container: String,
+    pub two_pass: bool,
+    pub args: String,
+    quality_slider: String,
+    json: HashMap<String, VideoEncodeSettings>,
 }
 
 impl VideoOpts {
-    pub fn new(args: &str, container: &Option<String>, two_pass: &Option<bool>) -> VideoOpts {
-        VideoOpts {
-            args: String::from(args),
-            container: container.to_owned(),
-            ffmpeg_args: String::new(),
-            two_pass: two_pass.to_owned(),
+    pub fn new(config_file: &Path) -> Result<VideoOpts, Box<dyn Error>> {
+        if !config_file.exists() {
+            let mut writer = File::create(config_file)?;
+            writer.write_all(
+r#"{
+  "default": {
+    "container": "mp4",
+    "two-pass": false,
+    "quality-slider": "crf",
+    "args": ""
+  },
+  "x264": {
+    "container": "mp4",
+    "args": "-c:v libx264 -pix_fmt yuv444p -preset veryslow -tune animation -deblock -1:-1"
+  },
+  "x265": {
+    "container": "mp4",
+    "two-pass": true,
+    "args": "-c:v libx265 -pix_fmt yuv444p -preset veryslow -tune animation -x265-params bframes=8:psy-rd=1:aq-mode=3:aq-strength=0.8:deblock=-3,-3"
+  },
+  "apng": {
+    "container": "apng",
+    "args": "-c:v apng"
+  },
+  "webp": {
+    "container": "webp",
+    "quality-slider": "qscale",
+    "args": "-c:v libwebp_anim"
+  },
+  "vp9": {
+    "container": "webm",
+    "two-pass": true,
+    "args": "-c:v libvpx-vp9 -pix_fmt yuv444p -b:v 0"
+  },
+  "aom-av1": {
+    "container": "mkv",
+    "args": "-c:v libaom-av1 -pix_fmt yuv444p10le -cpu-used 4 -tile-rows 2 -strict -2 -aq-mode 1 -aom-params enable-chroma-deltaq=1:deltaq-mode=3:qm-min=0:sharpness=2"
+  },
+  "aom-av1-simple": {
+    "container": "mkv",
+    "args": "-c:v libaom-av1 -pix_fmt yuv444p10le -b:v 0 -cpu-used 4 -tile-rows 2 -strict -2"
+  }
+}
+"#.as_bytes()
+                )?;
         }
+        let reader = File::open(config_file)?;
+        let json: HashMap<String, VideoEncodeSettings> = serde_json::from_reader(reader)?;
+        let default = json
+            .get("default")
+            .expect("No 'default' filed in config file");
+
+        Ok(VideoOpts {
+            args: default.args.to_string(),
+            container: default
+                .container
+                .as_ref()
+                .expect("Default 'container'(str) is not set")
+                .to_string(),
+            two_pass: default
+                .two_pass
+                .expect("Default use of 'two-pass'(bool) is not set"),
+            quality_slider: default
+                .quality_slider
+                .as_ref()
+                .expect("Default 'quality-slider'(str) if not set")
+                .to_string(),
+            json,
+        })
     }
 
     /// Match preset for ffmpeg if 'args' is preset name.
-    /// If container is "", assigns preset_container to container
-    // TODO toml config
-    pub fn args_match(&mut self) {
-        let preset_container: &str;
-        let preset_two_pass: bool;
-        let ffmpegargs = match self.args.as_str() {
-            "x264" => {
-                preset_container = "mp4";
-                preset_two_pass = false;
-                "-c:v libx264 -pix_fmt yuv444p -preset veryslow -tune animation -deblock -1:-1"
+    pub fn args_match(
+        &mut self,
+        args: &str,
+        container: &Option<String>,
+        two_pass: &Option<bool>,
+        quality: f32,
+    ) {
+        if let Some(preset) = self.json.get(args) {
+            if let Some(p_c) = &preset.container {
+                self.container = p_c.to_string();
             }
-            "x265" => {
-                preset_container = "mp4";
-                preset_two_pass = true;
-                "-c:v libx265 -pix_fmt yuv444p -preset veryslow -tune animation -x265-params bframes=8:psy-rd=1:aq-mode=3:aq-strength=0.8:deblock=-3,-3"
+            if let Some(p_tp) = preset.two_pass {
+                self.two_pass = p_tp;
             }
-            "apng" => {
-                preset_container = "apng";
-                preset_two_pass = false;
-                "-c:v apng"
-            }
-            "webp" => {
-                preset_container = "webp";
-                preset_two_pass = false;
-                "-c:v libwebp_anim"
-            }
-            "vp9" => {
-                preset_container = "webm";
-                preset_two_pass = true;
-                "-c:v libvpx-vp9 -pix_fmt yuv444p -b:v 0"
-            }
-            "aom-av1" => {
-                preset_container = "mkv";
-                preset_two_pass = false;
-                "-c:v libaom-av1 -pix_fmt yuv444p10le -cpu-used 4 -tile-rows 2 -strict -2 -aq-mode 1 -aom-params enable-chroma-deltaq=1:deltaq-mode=3:qm-min=0:sharpness=2"
-            }
-            "aom-av1-simple" => {
-                preset_container = "mkv";
-                preset_two_pass = false;
-                "-c:v libaom-av1 -pix_fmt yuv444p10le -b:v 0 -cpu-used 4 -tile-rows 2 -strict -2"
-            }
-            _ => {
-                preset_container = "mkv";
-                preset_two_pass = false;
-                &self.args
-            }
-        };
-        if self.container.is_none() {
-            self.container = Some(preset_container.into());
+            self.args = format!(
+                "{}{} -{} {}",
+                self.args, preset.args, self.quality_slider, quality
+            );
+        } else {
+            self.args = self.args.to_string() + args;
         }
-        if self.two_pass.is_none() {
-            self.two_pass = Some(preset_two_pass);
+
+        if let Some(c) = container {
+            self.container = c.to_string();
         }
-        self.ffmpeg_args = ffmpegargs.to_string();
+        if let Some(tp) = two_pass {
+            self.two_pass = *tp;
+        }
     }
 
-    pub fn presets_list() -> Vec<&'static str> {
-        vec![
-            "x264",
-            "x265",
-            "apng",
-            "webp",
-            "vp9",
-            "aom-av1",
-            "aom-av1-simple",
-        ]
+    pub fn presets_list(&self) -> Vec<&str> {
+        self.json.keys().map(|s| s.deref()).collect()
     }
 
     pub fn args_ispreset(&self) -> bool {
-        let presets = Self::presets_list();
+        let presets = self.presets_list();
         presets.contains(&self.args.as_str())
-    }
-
-    pub fn args_preset_add_quality(&mut self, q: f32) {
-        if !self.args_ispreset() {
-            return;
-        }
-        println!("{:?}", &self.args);
-        match self.args.as_ref() {
-            "x264" | "x265" | "vp9" | "aom-av1" | "aom-av1-simple" => {
-                self.ffmpeg_args += &format!(" -crf {}", &q)
-            }
-            "webp" => self.ffmpeg_args += &format!(" -qscale {}", &q),
-            _ => (),
-        }
-        self.args += &format!("-crf {}", &q);
     }
 }
 

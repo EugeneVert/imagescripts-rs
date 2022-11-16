@@ -70,9 +70,8 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
             .expect("Can't calculate frequent image dimms"),
     };
 
-    let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, &opt.container, &opt.two_pass);
-    videoopts.args_match();
-    videoopts.args_preset_add_quality(opt.preset_quality);
+    let mut videoopts = utils::VideoOpts::new(&dirs::config_dir().unwrap().join("vert/video_presets.json"))?;
+    videoopts.args_match(&opt.ffmpeg_args, &opt.container, &opt.two_pass, opt.preset_quality);
 
     let demuxerf_path = Path::new("./concat_demuxer");
     utils::ffmpeg_demuxer_create_from_files(demuxerf_path, &images)?;
@@ -81,7 +80,7 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
         "-r {fps} -safe 0 -f concat -i {demuxer_path} {0} \
         -vf scale={1}:{2}:force_original_aspect_ratio=decrease\
         ,pad={1}:{2}:(ow-iw)/2:(oh-ih)/2:'{background}'",
-        &videoopts.ffmpeg_args,
+        &videoopts.args,
         &dimm.0,
         &dimm.1,
         demuxer_path = &demuxerf_path.display(),
@@ -89,16 +88,14 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
         background = &opt.background,
     );
 
-    let container = videoopts.container.expect("No video container");
-    let two_pass = videoopts.two_pass.expect("No encoder passes count");
     let output_filestem = images[0]
         .file_stem()
         .and_then(|x| x.to_str())
         .ok_or_else(|| format!("No filestem: {}", images[0].display()))?;
-    utils::ffmpeg_run(&ffmpeg_cmd, output_filestem, two_pass, &container);
+    utils::ffmpeg_run(&ffmpeg_cmd, output_filestem, videoopts.two_pass, &videoopts.container);
 
     if opt.create_thumbnail {
-        let video_filename = format!("{}.{}", &output_filestem, &container);
+        let video_filename = format!("{}.{}", &output_filestem, &videoopts.container);
         generate_thumbnail(
             &video_filename,
             images.len(),

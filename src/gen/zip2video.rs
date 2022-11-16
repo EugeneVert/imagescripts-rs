@@ -43,9 +43,8 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
         }
     };
     // create options for encding video
-    let mut videoopts = utils::VideoOpts::new(&opt.ffmpeg_args, &opt.container, &opt.two_pass);
-    videoopts.args_match();
-    videoopts.args_preset_add_quality(opt.preset_quality);
+    let mut videoopts = utils::VideoOpts::new(&dirs::config_dir().unwrap().join("vert/video_presets.json"))?;
+    videoopts.args_match(&opt.ffmpeg_args, &opt.container, &opt.two_pass, opt.preset_quality);
 
     let demuxerf_path = tempdir.path().join("concat_demuxer");
     utils::ffmpeg_demuxer_create_from_json(&demuxerf_path, &json_mux)?;
@@ -53,19 +52,17 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
         "-f concat -i {} {} \
         -vf pad=ceil(iw/2)*2:ceil(ih/2)*2'",
         &demuxerf_path.display(),
-        &videoopts.ffmpeg_args,
+        &videoopts.args,
     );
     if opt.overwrite {
         ffmpeg_cmd += " -y"
     }
-    let container = videoopts.container.expect("No video container");
-    let two_pass = videoopts.two_pass.expect("No encoder passes count");
     let filestem = opt
         .input
         .file_stem()
         .and_then(OsStr::to_str)
         .ok_or_else(|| format!("No filestem; {}", &opt.input.display()))?;
-    utils::ffmpeg_run(&ffmpeg_cmd, filestem, two_pass, &container);
+    utils::ffmpeg_run(&ffmpeg_cmd, filestem, videoopts.two_pass, &videoopts.container);
 
     Ok(())
 }
