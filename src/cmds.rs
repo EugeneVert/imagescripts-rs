@@ -245,16 +245,16 @@ impl ImageBuffer {
         };
         let args: Vec<&str> = (args[..args.len() - 1]).split(',').collect();
 
-        let mut cmd = settings.get(name).unwrap().clone();
+        let mut setting = settings.get(name).unwrap().clone();
 
         for (i, v) in args.iter().enumerate() {
-            cmd.encode = cmd.encode.replace(&format!("%{}%", i + 1), v);
+            setting.encode = setting.encode.replace(&format!("%{}%", i + 1), v);
         }
 
         ImageBuffer {
-            encoder: cmd.encode,
-            extension: cmd.ext,
-            output_from_stdout: cmd.output_from_stdout.is_some(),
+            encoder: setting.encode,
+            extension: setting.ext,
+            output_from_stdout: setting.output_from_stdout.is_some(),
             ..Default::default()
         }
     }
