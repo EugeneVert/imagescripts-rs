@@ -2,6 +2,7 @@ use std::{error::Error, path::PathBuf};
 
 use clap::Args;
 use image::{
+    DynamicImage,
     ImageBuffer,
     // ImageResult,
     Luma,
@@ -24,7 +25,18 @@ pub struct Opt {
 
 pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     let img = image::open(&opt.input)?;
+    if image_is_detailed(&img, opt.threshold) {
+        if let (Some(o), Some(n)) = (opt.output, &opt.input.file_name()) {
+            if !o.exists() {
+                std::fs::create_dir(&o)?;
+            }
+            std::fs::rename(&opt.input, &o.join(n))?;
+        }
+    }
+    Ok(())
+}
 
+pub fn image_is_detailed(img: &DynamicImage, threshold: f32) -> bool {
     let mut img = img.to_luma8();
     imageproc::contrast::equalize_histogram_mut(&mut img);
     // let wh = img.dimensions();
@@ -68,16 +80,7 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     let out1 = imageproc::edges::canny(&img, 32.0, 64.0);
     let sum_div = pixels_sum(&out1) as f32 / pixels_sum(&out) as f32;
     println!("sum_div: {}", sum_div);
-    if sum_div > opt.threshold {
-        if let (Some(o), Some(n)) = (opt.output, &opt.input.file_name()) {
-            if !o.exists() {
-                std::fs::create_dir(&o)?;
-            }
-            std::fs::rename(&opt.input, &o.join(n))?;
-        }
-    }
-    // }
-    Ok(())
+    return sum_div > threshold;
 }
 
 fn pixels_sum(img: &ImageBuffer<Luma<u8>, Vec<u8>>) -> i64 {

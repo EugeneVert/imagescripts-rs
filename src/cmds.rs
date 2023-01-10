@@ -95,7 +95,7 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
 }
 
 /// Generate results from cmds and compare/save/output them
-fn process_image(
+pub fn process_image(
     img: &Path,
     opt: &Opt,
     settings: &HashMap<String, EncodeSetting>,
@@ -126,7 +126,7 @@ fn process_image(
         .cmds
         .par_iter()
         .map(|cmd| {
-            let mut buff = ImageBuffer::new(cmd, settings);
+            let mut buff = ImageBuffer::new_from_setting(cmd, settings);
             buff.image_generate(img).map(|_| buff)
         })
         .collect::<Result<_, _>>()?;
@@ -225,20 +225,29 @@ fn process_image(
 }
 
 #[derive(Default, Debug, Clone)]
-struct ImageBuffer {
-    image: BytesIO,
+pub struct ImageBuffer {
+    pub image: BytesIO,
     /// Encoder command
-    encoder: String,
+    pub encoder: String,
     /// Get image [from stdout | temporary file]
-    output_from_stdout: bool,
+    pub output_from_stdout: bool,
     /// Result image file extension (suffix)
-    extension: String,
+    pub extension: String,
     /// execution time
-    duration: core::time::Duration,
+    pub duration: core::time::Duration,
 }
 
 impl ImageBuffer {
-    fn new(cmd: &str, settings: &HashMap<String, EncodeSetting>) -> ImageBuffer {
+    pub fn new(encoder: &str, extension: &str, output_from_stdout: bool) -> Self {
+        Self {
+            encoder: encoder.to_string(),
+            extension: extension.to_string(),
+            output_from_stdout,
+            ..Default::default()
+        }
+    }
+
+    fn new_from_setting(cmd: &str, settings: &HashMap<String, EncodeSetting>) -> Self {
         let (name, args) = match cmd.split_once('(') {
             Some(s) => s,
             None => (cmd, " "),
@@ -251,7 +260,7 @@ impl ImageBuffer {
             setting.encode = setting.encode.replace(&format!("%{}%", i + 1), v);
         }
 
-        ImageBuffer {
+        Self {
             encoder: setting.encode,
             extension: setting.ext,
             output_from_stdout: setting.output_from_stdout.is_some(),
@@ -259,22 +268,22 @@ impl ImageBuffer {
         }
     }
 
-    fn get_size(&self) -> usize {
+    pub fn get_size(&self) -> usize {
         core::mem::size_of_val(&self.image[..])
     }
 
-    fn get_cmd(&self) -> String {
+    pub fn get_cmd(&self) -> String {
         self.encoder.to_string()
     }
 
-    fn image_generate(&mut self, img_path: &Path) -> Result<(), Box<dyn Error + Send + Sync>> {
+    pub fn image_generate(&mut self, img_path: &Path) -> Result<(), Box<dyn Error + Send + Sync>> {
         let time_start = std::time::Instant::now();
         self.gen_from_cmd(img_path)?;
         self.duration = time_start.elapsed();
         Ok(())
     }
 
-    fn gen_from_cmd(&mut self, img_path: &Path) -> std::io::Result<()> {
+    pub fn gen_from_cmd(&mut self, img_path: &Path) -> std::io::Result<()> {
         let mut split = self.encoder.split_whitespace();
         let encoder = split.next().ok_or(std::io::ErrorKind::InvalidData)?;
 
@@ -315,7 +324,7 @@ fn command_print_if_error(output: &std::process::Output) -> std::io::Result<()> 
     }
 }
 
-fn byte2size(num: u64) -> String {
+pub fn byte2size(num: u64) -> String {
     let mut num_f = num as f64;
     for unit in ["", "K", "M", "G"].iter() {
         if num_f < 1024.0 {
@@ -327,7 +336,7 @@ fn byte2size(num: u64) -> String {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct EncodeSetting {
+pub struct EncodeSetting {
     encode: String,
     ext: String,
     output_from_stdout: Option<()>,

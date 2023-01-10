@@ -47,7 +47,7 @@ fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(),
     // println!("File: {}", img.display());
     let img_image = image::open(&img)?;
 
-    if image_is_monochrome(img_image, opt.threshold, opt.grayscale) {
+    if image_is_monochrome(&img_image, opt.grayscale) <= opt.threshold {
         if opt.test {
             return Ok(());
         }
@@ -58,7 +58,7 @@ fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(),
     Ok(())
 }
 
-fn image_is_monochrome(img: image::DynamicImage, threshold: f32, grayscale: bool) -> bool {
+pub fn image_is_monochrome(img: &image::DynamicImage, grayscale: bool) -> f32 {
     if img.color().has_color() {
         // calculate thumbnail size
         let dim = img.dimensions();
@@ -66,14 +66,14 @@ fn image_is_monochrome(img: image::DynamicImage, threshold: f32, grayscale: bool
         let thumb_size = if dim < 2048 { 128 } else { 256 };
         // resize image
         let thumb = image::imageops::resize(
-            &img.into_rgb8(),
+            &img.to_rgb8(),
             thumb_size,
             thumb_size,
             image::imageops::Nearest,
         );
-        return image_is_monochrome_by_MSE(&thumb, threshold, true, grayscale);
+        return image_monochrome_MSE(&thumb, true, grayscale);
     }
-    true
+    -1.0
 }
 
 #[allow(clippy::float_cmp)] // '==' was not used on any calculated value
@@ -141,12 +141,11 @@ fn image_mean_color(image: &image::ImageBuffer<image::Rgb<u8>, Vec<u8>>) -> imag
 #[allow(non_snake_case)]
 /// Computes Mean Squared Error (x100) from mean hue bias by converting each pixel of the image to hsv
 /// returns true if MSE is less than mse_cutoff
-fn image_is_monochrome_by_MSE(
+fn image_monochrome_MSE(
     image: &image::ImageBuffer<image::Rgb<u8>, Vec<u8>>,
-    mse_cutoff: f32,
     adjust_color_bias: bool,
     grayscale: bool,
-) -> bool {
+) -> f32 {
     let mut sse = 0.0;
     let mut sse_step: f32;
     let mut hue_bias = 0.0;
@@ -174,5 +173,5 @@ fn image_is_monochrome_by_MSE(
     let image_dimensions = image.dimensions();
     let mse = sse / (image_dimensions.0 * image_dimensions.1) as f32 * 100.0;
 
-    mse <= mse_cutoff
+    mse
 }

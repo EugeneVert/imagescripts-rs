@@ -26,9 +26,6 @@ pub struct Opt {
     /// no_move
     #[arg(short)]
     no_move: bool,
-    /// display using this command
-    display: Option<String>
-
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
