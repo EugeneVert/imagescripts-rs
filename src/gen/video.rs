@@ -92,8 +92,11 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     let demuxerf_path = Path::new("./concat_demuxer");
     ffmpeg_demuxer_create_from_files(demuxerf_path, &images)?;
 
+    // TODO png RGB->YUV BT709 colorspace matrix conversion
+    // -vf "zscale=m=709:min=709:r=limited,format=yuv420p10le" -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv
     let ffmpeg_cmd = format!(
         "-r {fps} -safe 0 -f concat -i {demuxer_path} {0} \
+        -sws_flags spline+accurate_rnd+full_chroma_int \
         -vf scale={1}:{2}:force_original_aspect_ratio=decrease\
         ,pad={1}:{2}:(ow-iw)/2:(oh-ih)/2:'{background}'",
         &videoopts.args,
