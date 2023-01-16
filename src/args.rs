@@ -20,6 +20,7 @@ pub enum Commands {
         subcommand: SelectableGen,
     },
     Cmds(cmds::Opt),
+    Convert(convert::Opt),
     ShellCompletions,
 }
 

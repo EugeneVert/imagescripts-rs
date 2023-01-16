@@ -56,7 +56,7 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
         .map(|img| {
             (
                 img.to_path_buf(),
-                gen_hash(img, map.clone(), &hasher)
+                gen_hash(img, Arc::clone(&map), &hasher)
                     .unwrap_or_else(|_| panic!("Error processing image: {}", &img.display())),
             )
         })

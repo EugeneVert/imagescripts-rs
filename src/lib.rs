@@ -6,6 +6,7 @@ pub mod find {
     pub mod similar;
 }
 pub mod cmds;
+pub mod convert;
 pub mod csv_output;
 pub mod gen;
 pub mod utils;

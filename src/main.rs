@@ -20,6 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             args::SelectableGen::Zip2video(opt) => gen::zip2video::main(opt)?,
         },
         args::Commands::Cmds(opt) => cmds::main(opt)?,
+        args::Commands::Convert(opt) => convert::main(opt)?,
         args::Commands::ShellCompletions => gen_shell_completions()?,
     }
     Ok(())
