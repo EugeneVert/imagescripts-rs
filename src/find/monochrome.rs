@@ -45,7 +45,7 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
 
 fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
     // println!("File: {}", img.display());
-    let img_image = image::open(&img)?;
+    let img_image = image::open(img)?;
 
     if image_is_monochrome(&img_image, opt.grayscale) <= opt.threshold {
         if opt.test {
@@ -171,7 +171,7 @@ fn image_monochrome_MSE(
     }
 
     let image_dimensions = image.dimensions();
-    let mse = sse / (image_dimensions.0 * image_dimensions.1) as f32 * 100.0;
 
-    mse
+    // MSE
+    sse / (image_dimensions.0 * image_dimensions.1) as f32 * 100.0
 }

@@ -150,7 +150,7 @@ fn generate_thumbnail(
     // using ffmpeg, and save them to the temporary directory
     std::process::Command::new("ffmpeg")
         .arg("-i")
-        .arg(&video_filename)
+        .arg(video_filename)
         .arg("-vf")
         .arg(format!(
             "                                                             \

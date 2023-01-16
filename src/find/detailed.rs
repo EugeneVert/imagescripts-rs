@@ -80,7 +80,8 @@ pub fn image_is_detailed(img: &DynamicImage, threshold: f32) -> bool {
     let out1 = imageproc::edges::canny(&img, 32.0, 64.0);
     let sum_div = pixels_sum(&out1) as f32 / pixels_sum(&out) as f32;
     println!("sum_div: {}", sum_div);
-    return sum_div > threshold;
+
+    sum_div > threshold
 }
 
 fn pixels_sum(img: &ImageBuffer<Luma<u8>, Vec<u8>>) -> i64 {

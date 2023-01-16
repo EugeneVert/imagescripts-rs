@@ -51,7 +51,7 @@ fn unwrap_two<T>(l: Option<T>, b: Option<T>) -> T {
 
 fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
     let img_filesize = img.metadata()?.len();
-    let img_dimensions = image::image_dimensions(&img)?;
+    let img_dimensions = image::image_dimensions(img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
     let img_bpp = (img_filesize * 8) as f32 / px_count as f32;
     let img_metric = if opt.custom_metric {

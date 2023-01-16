@@ -101,7 +101,7 @@ pub fn process_image(
     settings: &HashMap<String, EncodeSetting>,
 ) -> Result<String, Box<dyn Error + Send + Sync>> {
     let img_filesize = img.metadata()?.len() as usize;
-    let img_dimensions = image::image_dimensions(&img)?;
+    let img_dimensions = image::image_dimensions(img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
     let tolerance = opt.tolerance * 1024; // KiB
 
@@ -344,7 +344,7 @@ pub struct EncodeSetting {
 
 fn settings_load(file: &Path) -> Result<HashMap<String, EncodeSetting>, Box<dyn Error>> {
     if !file.exists() {
-        let mut writer = File::create(&file)?;
+        let mut writer = File::create(file)?;
         writer.write_all(
 r#"{
   "cjxl_d": {

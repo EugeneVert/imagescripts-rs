@@ -42,7 +42,7 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
             .file_name()
             .and_then(OsStr::to_str)
             .ok_or_else(|| format!("Can't get image filename: {}", &image.display()))?;
-        std::fs::rename(&image, out_dir.join(&filename))?;
+        std::fs::rename(&image, out_dir.join(filename))?;
     }
 
     Ok(())
@@ -68,7 +68,7 @@ fn get_images_to_mv(images: &[PathBuf], opt: &Opt) -> Vec<PathBuf> {
 }
 
 fn is_image_to_move(image: &Path, opt: &Opt) -> Result<bool, Box<dyn Error>> {
-    let img_dimmensions = image::image_dimensions(&image)?;
+    let img_dimmensions = image::image_dimensions(image)?;
     if img_dimmensions.0 > opt.px_size || img_dimmensions.1 > opt.px_size {
         Ok(true)
     } else {

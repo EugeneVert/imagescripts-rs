@@ -100,9 +100,10 @@ pub fn process_image(
         Format::Webp => todo!(),
     };
     encode_and_save_best(cmds, &filepath, &output_path, img_filesize)?;
-    Ok(if let Some(tmp) = tmp {
+    if let Some(tmp) = tmp {
         tmp.close()?;
-    })
+    }
+    Ok(())
 }
 
 fn encode_and_save_best(
@@ -193,6 +194,9 @@ fn process_manga_image(
 //     image::load_from_memory_with_format(&p.stdout, image::ImageFormat::Png).map_err(|e| e.into())
 // }
 
+/// Image path, loaded image, monochrome flag and possible handle to temporary file
+type PossibleMonochromeImageBundle = (PathBuf, DynamicImage, bool, Option<NamedTempFile>);
+
 /// Convert image to grayscale if image is monochrome.
 /// Ask user is image monochrome if unsure.
 /// Return original filepath and image otherwise
@@ -201,17 +205,15 @@ fn image_to_grayscale_if_monochrome(
     filepath: PathBuf,
     format: Format,
     monochrome_mse: f32,
-) -> Result<(PathBuf, DynamicImage, bool, Option<NamedTempFile>), Box<dyn Error>> {
+) -> Result<PossibleMonochromeImageBundle, Box<dyn Error>> {
     if monochrome_mse == -1.0 {
         return Ok((filepath, img, true, None));
     }
     if monochrome_mse >= 896.0 {
         return Ok((filepath, img, false, None));
     }
-    if monochrome_mse > 0.0 {
-        if !ask_is_monochrome(&filepath) {
-            return Ok((filepath, img, false, None));
-        }
+    if monochrome_mse > 0.0 && !ask_is_monochrome(&filepath) {
+        return Ok((filepath, img, false, None));
     }
 
     let tmp = tempfile::Builder::new()
