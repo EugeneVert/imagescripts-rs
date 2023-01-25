@@ -29,10 +29,10 @@ pub struct Opt {
     /// Path to json file with cmds config
     #[arg(long)]
     cmds_config_json: Option<PathBuf>,
-    /// (KiB) tolerance of commands to the following ones{n}
-    /// {n} (when not saving all results)
-    #[arg(short, long, default_value = "100", allow_negative_numbers = true)]
-    tolerance: usize,
+    /// tolerance in % of original for saving results{n}
+    /// (do nothing in case of saving all results)
+    #[arg(short, long, default_value = "10", allow_negative_numbers = true)]
+    tolerance: u16,
     /// save all encoded images (Not only the best compressed one)
     #[arg(long = "save")]
     save_all: bool,
@@ -103,8 +103,7 @@ pub fn process_image(
     let img_filesize = img.metadata()?.len() as usize;
     let img_dimensions = image::image_dimensions(img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
-    let tolerance = opt.tolerance * 1024; // KiB
-
+    let tolerance = opt.tolerance; // %
     let out_dir = &opt.out_dir;
 
     // csv | open writer, push orig image filename&size
@@ -119,6 +118,7 @@ pub fn process_image(
     };
 
     let mut res_filesize: usize = 0;
+    let mut res_percentage_of_original = 100;
 
     let mut res_buff = &ImageBuffer::default();
     // generate results in ImageBuffers for each cmd
@@ -139,20 +139,19 @@ pub fn process_image(
     for (i, buff) in enc_img_buffers.iter().enumerate() {
         let buff_filesize = buff.get_size();
         let buff_bpp = (buff_filesize * 8) as f64 / px_count as f64;
-        let percentage_of_original = format!("{:.2}", (100 * buff_filesize / img_filesize));
+        let buff_percentage_of_original = (100 * buff_filesize / img_filesize) as i32;
         let better = buff_filesize != 0
             && buff_filesize < img_filesize
-            && (res_filesize == 0
-                || (res_filesize as i64 - buff_filesize as i64) > tolerance as i64);
+            && (res_percentage_of_original - buff_percentage_of_original) > tolerance as i32;
 
         if !opt.no_progress {
             let printing_status = format!(
-                "{}\n{} --> {}\t{:6.2}bpp\t{}% {is_better}\t{:>6.2}s",
+                "{}\n{} --> {}\t{:6.2}bpp\t{:6.2}% {is_better}\t{:>6.2}s",
                 &buff.get_cmd(),
                 byte2size(img_filesize as u64),
                 byte2size(buff_filesize as u64),
                 &buff_bpp,
-                percentage_of_original,
+                buff_percentage_of_original,
                 &buff.duration.as_secs_f32(),
                 is_better = if better { "* " } else { "" },
             );
@@ -161,7 +160,7 @@ pub fn process_image(
 
         if opt.csv_save {
             csv_row[2 + i] = buff_filesize.to_string();
-            csv_row[2 + cmds_count + i] = percentage_of_original;
+            csv_row[2 + cmds_count + i] = buff_percentage_of_original.to_string();
         }
 
         if opt.save_all {
@@ -185,6 +184,7 @@ pub fn process_image(
         if better {
             res_buff = buff;
             res_filesize = buff_filesize;
+            res_percentage_of_original = buff_percentage_of_original;
         }
     }
 
@@ -198,7 +198,7 @@ pub fn process_image(
     }
 
     // save res_buf
-    if res_filesize == img_filesize {
+    if res_filesize == 0 {
         std::fs::copy(img, out_dir.join(img.file_name().unwrap()))?;
         if !opt.no_progress {
             println!("Save: Copy input");

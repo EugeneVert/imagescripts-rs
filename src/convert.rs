@@ -13,7 +13,7 @@ use rayon::prelude::IntoParallelRefIterator;
 use tempfile::{self, NamedTempFile};
 
 use crate::cmds::ImageBuffer;
-use crate::find::detailed::image_is_detailed;
+// use crate::find::detailed::image_is_detailed;
 use crate::find::monochrome::image_is_monochrome;
 
 #[derive(Args, Debug, Clone)]
@@ -32,18 +32,18 @@ enum Format {
 }
 
 impl Format {
-    fn match_file_format_or_panic(filepath: &Path) -> Self {
+    fn from_file_format(filepath: &Path) -> Option<Self> {
         match filepath
             .extension()
-            .unwrap()
+            .unwrap_or_default()
             .to_string_lossy()
             .to_lowercase()
             .as_str()
         {
-            "png" => Self::Png,
-            "jpg" | "jpeg" => Self::Jpeg,
-            "webp" => Self::Webp,
-            _ => panic!(),
+            "png" => Some(Self::Png),
+            "jpg" | "jpeg" => Some(Self::Jpeg),
+            "webp" => Some(Self::Webp),
+            _ => None,
         }
     }
     fn as_ext(&self) -> &str {
@@ -65,23 +65,27 @@ pub fn process_image(
     output_path: PathBuf,
     manga: Option<u8>,
 ) -> Result<(), Box<dyn Error>> {
-    let format = Format::match_file_format_or_panic(&input_path);
-    let img = image::open(&input_path).expect("Can't open input image file from input_path");
+    let format = Format::from_file_format(&input_path).ok_or("Can't parse image format")?;
+    let img = image::open(&input_path)
+        .map_err(|e| format!("Can't open input image file from input_path: {}", e))?;
+
     if manga.is_some() {
         return process_manga_image(img, input_path, format);
     }
     let monochrome_mse = image_is_monochrome(&img, false);
-    let (filepath, img, _is_grayscale, tmp) =
+    let (filepath, _, _is_grayscale, tmp) =
         image_to_grayscale_if_monochrome(img, input_path, format, monochrome_mse)?;
-    let is_detailed = image_is_detailed(&img, 2.1);
+    // let is_detailed = image_is_detailed(&img, 2.1);
     let img_filesize = std::fs::metadata(&filepath)?.len() as usize;
+
     println!(
         "{:?} {:?}, {:?}, {:?}",
         filepath.display(),
         format,
         monochrome_mse,
-        is_detailed
+        "" // is_detailed
     );
+
     let cmds: Vec<_> = match format {
         Format::Png => {
             vec![
@@ -99,7 +103,9 @@ pub fn process_image(
         }
         Format::Webp => todo!(),
     };
-    encode_and_save_best(cmds, &filepath, &output_path, img_filesize)?;
+
+    encode_and_save_best(&filepath, &output_path, cmds, img_filesize)?;
+
     if let Some(tmp) = tmp {
         tmp.close()?;
     }
@@ -107,13 +113,14 @@ pub fn process_image(
 }
 
 fn encode_and_save_best(
-    cmds: Vec<(&str, &str, bool, i32)>,
     input_path: &Path,
     output_path: &Path,
+    cmds: Vec<(&str, &str, bool, i32)>,
     img_filesize: usize,
 ) -> Result<(), Box<dyn Error>> {
     let mut best = &ImageBuffer::default();
     let mut best_filesize: usize = 0;
+    let mut best_percentage_of_original = 100;
     let enc_img_buffers: Vec<ImageBuffer> = cmds
         .par_iter()
         .map(|cmd| {
@@ -125,19 +132,17 @@ fn encode_and_save_best(
 
     for (i, buff) in enc_img_buffers.iter().enumerate() {
         let buff_filesize = buff.get_size();
-        let percentage_of_original = format!("{:.2}", (100 * buff_filesize / img_filesize));
+        let buff_percentage_of_original = (100 * buff_filesize / img_filesize) as i32;
         let better = buff_filesize != 0
             && buff_filesize < img_filesize
-            && (best_filesize == 0
-                || (best_filesize as f32 - buff_filesize as f32) / (best_filesize as f32) * 100.0
-                    > cmds[i].3 as f32);
+            && (best_percentage_of_original - buff_percentage_of_original) > cmds[i].3;
 
         let printing_status = format!(
-            "{}\n{} --> {}\t{}% {is_better}\t{:>6.2}s",
+            "{}\n{} --> {}\t{:6.2}% {is_better}\t{:>6.2}s",
             &buff.get_cmd(),
             crate::cmds::byte2size(img_filesize as u64),
             crate::cmds::byte2size(buff_filesize as u64),
-            percentage_of_original,
+            buff_percentage_of_original,
             &buff.duration.as_secs_f32(),
             is_better = if better { "* " } else { "" },
         );
@@ -146,10 +151,14 @@ fn encode_and_save_best(
         if better {
             best = buff;
             best_filesize = buff_filesize;
+            best_percentage_of_original = buff_percentage_of_original;
         }
     }
     if best_filesize == 0 {
-        std::fs::copy(input_path, output_path)?;
+        std::fs::copy(
+            input_path,
+            output_path.with_extension(input_path.extension().unwrap()),
+        )?;
         return Ok(());
     }
     let save_path = output_path.with_extension(&best.extension);
