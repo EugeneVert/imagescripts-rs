@@ -13,13 +13,14 @@ use rayon::prelude::IntoParallelRefIterator;
 use tempfile::{self, NamedTempFile};
 
 use crate::cmds::ImageBuffer;
-// use crate::find::detailed::image_is_detailed;
 use crate::find::monochrome::image_is_monochrome;
 
 #[derive(Args, Debug, Clone)]
 pub struct Opt {
     input: PathBuf,
     output: PathBuf,
+    #[arg(short, long)]
+    avif: bool,
     #[arg(short, long)]
     manga: Option<u8>,
 }
@@ -56,51 +57,64 @@ impl Format {
 }
 
 pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
-    process_image(opt.input, opt.output, opt.manga)?;
+    process_image(opt.input, opt.output, opt.avif, opt.manga)?;
     Ok(())
 }
 
 pub fn process_image(
     input_path: PathBuf,
     output_path: PathBuf,
+    avif: bool,
     manga: Option<u8>,
 ) -> Result<(), Box<dyn Error>> {
     let format = Format::from_file_format(&input_path).ok_or("Can't parse image format")?;
-    let img = image::open(&input_path)
-        .map_err(|e| format!("Can't open input image file from input_path: {}", e))?;
+    let img = image::open(&input_path).map_err(|e| {
+        format!(
+            "Can't open input image file from input_path {}: {}",
+            &input_path.display(),
+            e
+        )
+    })?;
 
     if manga.is_some() {
         return process_manga_image(img, input_path, format);
     }
+
     let monochrome_mse = image_is_monochrome(&img, false);
     let (filepath, _, _is_grayscale, tmp) =
         image_to_grayscale_if_monochrome(img, input_path, format, monochrome_mse)?;
-    // let is_detailed = image_is_detailed(&img, 2.1);
     let img_filesize = std::fs::metadata(&filepath)?.len() as usize;
 
     println!(
-        "{:?} {:?}, {:?}, {:?}",
+        "{:?} {:?}, {:?}",
         filepath.display(),
         format,
         monochrome_mse,
-        "" // is_detailed
     );
 
     let cmds: Vec<_> = match format {
-        Format::Png => {
-            vec![
+        Format::Png => match avif {
+            true => vec![
+                ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 0),
+                ("cavif -Q 90 -f -o", "avif", false, 70),
+            ],
+            false => vec![
                 ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 0),
                 ("cjxl -d 0 -j 0 -m 1 -e 7", "jxl", false, 0),
                 ("cjxl -d 1 -j 0 -m 0 -e 7", "jxl", false, 70),
-            ]
-        }
-        Format::Jpeg => {
-            vec![
+            ],
+        },
+        Format::Jpeg => match avif {
+            true => vec![
+                ("cjxl -d 0 -j 1 -m 0 -e 9", "jxl", false, 0),
+                ("cavif -Q 90 -f -o", "avif", false, 32),
+            ],
+            false => vec![
                 ("cjxl -d 0 -j 1 -m 0 -e 9", "jxl", false, 0),
                 ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 10),
                 ("cjxl -d 1.5 -j 0 -m 0 -e 7", "jxl", false, 32),
-            ]
-        }
+            ],
+        },
         Format::Webp => todo!(),
     };
 
