@@ -23,6 +23,8 @@ pub struct Opt {
     avif: bool,
     #[arg(short, long)]
     manga: Option<u8>,
+    #[arg(short, long)]
+    renaame_original: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -57,7 +59,13 @@ impl Format {
 }
 
 pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
-    process_image(opt.input, opt.output, opt.avif, opt.manga)?;
+    process_image(
+        opt.input,
+        opt.output,
+        opt.avif,
+        opt.manga,
+        opt.renaame_original,
+    )?;
     Ok(())
 }
 
@@ -66,6 +74,7 @@ pub fn process_image(
     output_path: PathBuf,
     avif: bool,
     manga: Option<u8>,
+    rename_original: bool,
 ) -> Result<(), Box<dyn Error>> {
     let format = Format::from_file_format(&input_path).ok_or("Can't parse image format")?;
     let img = image::open(&input_path).map_err(|e| {
@@ -86,7 +95,7 @@ pub fn process_image(
     let img_filesize = std::fs::metadata(&filepath)?.len() as usize;
 
     println!(
-        "{:?} {:?}, {:?}",
+        "N: {:?}, F: {:?}, M_MSE: {:?}",
         filepath.display(),
         format,
         monochrome_mse,
@@ -96,12 +105,12 @@ pub fn process_image(
         Format::Png => match avif {
             true => vec![
                 ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 0),
-                ("cavif -Q 90 -f -o", "avif", false, 70),
+                ("cavif -Q 90 -f -o", "avif", false, 40),
             ],
             false => vec![
                 ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 0),
                 ("cjxl -d 0 -j 0 -m 1 -e 7", "jxl", false, 0),
-                ("cjxl -d 1 -j 0 -m 0 -e 7", "jxl", false, 70),
+                ("cjxl -d 1 -j 0 -m 0 -e 7", "jxl", false, 40),
             ],
         },
         Format::Jpeg => match avif {
@@ -118,7 +127,31 @@ pub fn process_image(
         Format::Webp => todo!(),
     };
 
-    encode_and_save_best(&filepath, &output_path, cmds, img_filesize)?;
+    let (best, ext) = encode_and_get_best(&filepath, cmds)?;
+
+    if rename_original {
+        std::fs::rename(
+            &input_path,
+            input_path.with_extension(
+                input_path
+                    .extension()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+                    + "~",
+            ),
+        )?;
+    }
+
+    if ext == "copy" {
+        std::fs::write(
+            output_path.with_extension(input_path.extension().unwrap()),
+            best,
+        )?;
+    } else {
+        std::fs::write(output_path.with_extension(ext), best)?;
+    }
 
     if let Some(tmp) = tmp {
         tmp.close()?;
@@ -126,12 +159,11 @@ pub fn process_image(
     Ok(())
 }
 
-fn encode_and_save_best(
+fn encode_and_get_best(
     input_path: &Path,
-    output_path: &Path,
     cmds: Vec<(&str, &str, bool, i32)>,
-    img_filesize: usize,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(Vec<u8>, String), Box<dyn Error>> {
+    let img_filesize = std::fs::metadata(input_path)?.len() as usize;
     let mut best = &ImageBuffer::default();
     let mut best_filesize: usize = 0;
     let mut best_percentage_of_original = 100;
@@ -168,17 +200,12 @@ fn encode_and_save_best(
             best_percentage_of_original = buff_percentage_of_original;
         }
     }
+
     if best_filesize == 0 {
-        std::fs::copy(
-            input_path,
-            output_path.with_extension(input_path.extension().unwrap()),
-        )?;
-        return Ok(());
+        return Ok((std::fs::read(input_path)?, "copy".to_string()));
     }
-    let save_path = output_path.with_extension(&best.extension);
-    println!("{}", save_path.display());
-    std::fs::write(save_path, &best.image)?;
-    Ok(())
+
+    Ok((best.image.to_owned(), best.extension.to_string()))
 }
 
 fn process_manga_image(
