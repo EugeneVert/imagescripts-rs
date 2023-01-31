@@ -1,5 +1,6 @@
 // NOTE Q: what about digikam output filename extension? A: Rename images in digikam using dk-album-manage
 // DONE replace get_temp_path with Temp crate or delete them mannualy
+// DONE resize
 // TODO what to do with webp? cjxl/avifenc does't support it
 // TODO implement manga mode
 
@@ -7,7 +8,7 @@ use std::path::Path;
 use std::{error::Error, path::PathBuf};
 
 use clap::Args;
-use image::{self, DynamicImage};
+use image::{self, DynamicImage, GenericImageView};
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefIterator;
 use tempfile::{self, NamedTempFile};
@@ -76,8 +77,9 @@ pub fn process_image(
     manga: Option<u8>,
     rename_original: bool,
 ) -> Result<(), Box<dyn Error>> {
-    let format = Format::from_file_format(&input_path).ok_or("Can't parse image format")?;
-    let img = image::open(&input_path).map_err(|e| {
+    // LOAD
+    let mut format = Format::from_file_format(&input_path).ok_or("Can't parse image format")?;
+    let mut img = image::open(&input_path).map_err(|e| {
         format!(
             "Can't open input image file from input_path {}: {}",
             &input_path.display(),
@@ -85,8 +87,25 @@ pub fn process_image(
         )
     })?;
 
+    // RESIZE
+    let size = img.dimensions();
+    let filepath;
+    let mut tmp1 = None;
+    if size.0 > 3508 || size.1 > 3508 {
+        tmp1 = Some(tempfile::Builder::new().suffix(".png").tempfile()?);
+        let tmp_path1 = tmp1.as_ref().unwrap().path().to_path_buf();
+        img = img.resize(3508, 3508, image::imageops::FilterType::Lanczos3);
+        img.save(&tmp_path1)?;
+        format = Format::Png;
+        filepath = tmp_path1;
+        println!("resized to 3508");
+    } else {
+        filepath = input_path.clone();
+    }
+
+    // PROCESS MANGA
     if manga.is_some() {
-        return process_manga_image(img, input_path, format);
+        return process_manga_image(img, filepath, format);
     }
 
     let monochrome_mse = image_is_monochrome(&img, false);
@@ -101,6 +120,7 @@ pub fn process_image(
         monochrome_mse,
     );
 
+    // ENCODE SETTINGS
     let cmds: Vec<_> = match format {
         Format::Png => match avif {
             true => vec![
@@ -127,33 +147,41 @@ pub fn process_image(
         Format::Webp => todo!(),
     };
 
+    // ENCODE
     let (best, ext) = encode_and_get_best(&filepath, cmds)?;
 
+    // BACKUP
     if rename_original {
         std::fs::rename(
             &input_path,
-            input_path.with_extension(
+            input_path.with_file_name(
                 input_path
-                    .extension()
+                    .file_stem()
                     .unwrap()
                     .to_str()
                     .unwrap()
                     .to_string()
-                    + "~",
+                    + "-bak."
+                    + input_path.extension().unwrap().to_str().unwrap(),
             ),
         )?;
     }
 
+    // WRITE RESULT
     if ext == "copy" {
         std::fs::write(
-            output_path.with_extension(input_path.extension().unwrap()),
+            output_path.with_extension(filepath.extension().unwrap()),
             best,
         )?;
     } else {
         std::fs::write(output_path.with_extension(ext), best)?;
     }
 
-    if let Some(tmp) = tmp {
+    // CLEANUP
+    if let Some(tmp) = tmp1 {
+        tmp.close()?;
+    }
+    if let Some(tmp) = tmp2 {
         tmp.close()?;
     }
     Ok(())
@@ -167,6 +195,7 @@ fn encode_and_get_best(
     let mut best = &ImageBuffer::default();
     let mut best_filesize: usize = 0;
     let mut best_percentage_of_original = 100;
+
     let enc_img_buffers: Vec<ImageBuffer> = cmds
         .par_iter()
         .map(|cmd| {
@@ -270,6 +299,7 @@ fn image_to_grayscale_if_monochrome(
         .suffix(&format.as_ext())
         .tempfile()?;
     let tmp_path = tmp.path().to_path_buf();
+
     match format {
         Format::Jpeg => {
             let _img = jpegtran_grayscale(&filepath, &tmp_path)?;
