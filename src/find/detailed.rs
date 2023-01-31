@@ -30,7 +30,7 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
             if !o.exists() {
                 std::fs::create_dir(&o)?;
             }
-            std::fs::rename(&opt.input, &o.join(n))?;
+            std::fs::rename(&opt.input, o.join(n))?;
         }
     }
     Ok(())

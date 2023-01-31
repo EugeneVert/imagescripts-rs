@@ -254,7 +254,7 @@ impl ImageBuffer {
         };
         let args: Vec<&str> = (args[..args.len() - 1]).split(',').collect();
 
-        let mut setting = settings.get(name).unwrap().clone();
+        let mut setting = settings.get(name).expect("No such setting").clone();
 
         for (i, v) in args.iter().enumerate() {
             setting.encode = setting.encode.replace(&format!("%{}%", i + 1), v);
