@@ -9,6 +9,7 @@ pub mod cmds;
 pub mod convert;
 pub mod csv_output;
 pub mod gen;
+pub mod jpegquality;
 pub mod utils;
 
 pub mod args;

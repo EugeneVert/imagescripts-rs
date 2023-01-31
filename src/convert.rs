@@ -1,5 +1,6 @@
 // NOTE Q: what about digikam output filename extension? A: Rename images in digikam using dk-album-manage
 // DONE replace get_temp_path with Temp crate or delete them mannualy
+// DONE jpeg quality estimation (then convert cjxl_tr(7), cjxl_d(2))
 // DONE resize
 // TODO what to do with webp? cjxl/avifenc does't support it
 // TODO implement manga mode
@@ -15,6 +16,7 @@ use tempfile::{self, NamedTempFile};
 
 use crate::cmds::ImageBuffer;
 use crate::find::monochrome::image_is_monochrome;
+use crate::jpegquality::jpeg_quality;
 
 #[derive(Args, Debug, Clone)]
 pub struct Opt {
@@ -108,10 +110,16 @@ pub fn process_image(
         return process_manga_image(img, filepath, format);
     }
 
+    // MONOCHROME
     let monochrome_mse = image_is_monochrome(&img, false);
-    let (filepath, _, _is_grayscale, tmp) =
-        image_to_grayscale_if_monochrome(img, input_path, format, monochrome_mse)?;
-    let img_filesize = std::fs::metadata(&filepath)?.len() as usize;
+    let (filepath, _, _is_grayscale, tmp2) =
+        image_to_grayscale_if_monochrome(img, filepath.clone(), format, monochrome_mse)?;
+
+    // ESTIMATE JPEG QUALITY
+    let quality = match format {
+        Format::Jpeg => Some(jpeg_quality(&filepath)?),
+        _ => None,
+    };
 
     println!(
         "N: {:?}, F: {:?}, M_MSE: {:?}",
@@ -133,16 +141,22 @@ pub fn process_image(
                 ("cjxl -d 1 -j 0 -m 0 -e 7", "jxl", false, 40),
             ],
         },
-        Format::Jpeg => match avif {
-            true => vec![
+        Format::Jpeg => match quality {
+            Some(q) if q < 90.0 => vec![
                 ("cjxl -d 0 -j 1 -m 0 -e 9", "jxl", false, 0),
-                ("cavif -Q 90 -f -o", "avif", false, 32),
+                ("cjxl -d 2 -j 0 -m 0 -e 7", "jxl", false, 0),
             ],
-            false => vec![
-                ("cjxl -d 0 -j 1 -m 0 -e 9", "jxl", false, 0),
-                ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 10),
-                ("cjxl -d 1.5 -j 0 -m 0 -e 7", "jxl", false, 32),
-            ],
+            _ => match avif {
+                true => vec![
+                    ("cjxl -d 0 -j 1 -m 0 -e 8", "jxl", false, 0),
+                    ("cavif -Q 90 -f -o", "avif", false, 32),
+                ],
+                false => vec![
+                    ("cjxl -d 0 -j 1 -m 0 -e 8", "jxl", false, 0),
+                    ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 10),
+                    ("cjxl -d 1 -j 0 -m 0 -e 7", "jxl", false, 32),
+                ],
+            },
         },
         Format::Webp => todo!(),
     };
