@@ -27,7 +27,11 @@ pub struct Opt {
     #[arg(short, long)]
     manga: Option<u8>,
     #[arg(short, long)]
-    renaame_original: bool,
+    rename_original: bool,
+    #[arg(long)]
+    no_monochrome_check: bool,
+    #[arg(long)]
+    no_resize: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -67,7 +71,9 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
         opt.output,
         opt.avif,
         opt.manga,
-        opt.renaame_original,
+        opt.rename_original,
+        !opt.no_monochrome_check,
+        !opt.no_resize,
     )?;
     Ok(())
 }
@@ -75,9 +81,11 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
 pub fn process_image(
     input_path: PathBuf,
     output_path: PathBuf,
-    avif: bool,
-    manga: Option<u8>,
+    use_avif: bool,
+    manga_mode: Option<u8>,
     rename_original: bool,
+    monochrome_check: bool,
+    resize: bool,
 ) -> Result<(), Box<dyn Error>> {
     // LOAD
     let mut format = Format::from_file_format(&input_path).ok_or("Can't parse image format")?;
@@ -89,11 +97,17 @@ pub fn process_image(
         )
     })?;
 
+    // ESTIMATE JPEG QUALITY
+    let quality = match format {
+        Format::Jpeg => Some(jpeg_quality(&input_path)?),
+        _ => None,
+    };
+
     // RESIZE
     let size = img.dimensions();
     let filepath;
     let mut tmp1 = None;
-    if size.0 > 3508 || size.1 > 3508 {
+    if resize && (size.0 > 3508 || size.1 > 3508) && quality.unwrap_or(100.0) > 90.0 {
         tmp1 = Some(tempfile::Builder::new().suffix(".png").tempfile()?);
         let tmp_path1 = tmp1.as_ref().unwrap().path().to_path_buf();
         img = img.resize(3508, 3508, image::imageops::FilterType::Lanczos3);
@@ -106,60 +120,29 @@ pub fn process_image(
     }
 
     // PROCESS MANGA
-    if manga.is_some() {
+    if manga_mode.is_some() {
         return process_manga_image(img, filepath, format);
     }
 
     // MONOCHROME
-    let monochrome_mse = image_is_monochrome(&img, false);
-    let (filepath, _, _is_grayscale, tmp2) =
-        image_to_grayscale_if_monochrome(img, filepath.clone(), format, monochrome_mse)?;
-
-    // ESTIMATE JPEG QUALITY
-    let quality = match format {
-        Format::Jpeg => Some(jpeg_quality(&filepath)?),
-        _ => None,
+    let monochrome_mse = if monochrome_check {
+        image_is_monochrome(&img, false)
+    } else {
+        f32::INFINITY
     };
+    let (filepath, _, _is_grayscale, tmp2) =
+        image_to_grayscale_if_monochrome(img, filepath, format, monochrome_mse)?;
 
     println!(
-        "N: {:?}, F: {:?}, M_MSE: {:?}",
-        filepath.display(),
+        "N: {:?}, F: {:?}, M_MSE: {:?}, Q: {}",
+        input_path.display(),
         format,
         monochrome_mse,
+        quality.unwrap_or_default(),
     );
 
     // ENCODE SETTINGS
-    let cmds: Vec<_> = match format {
-        Format::Png => match avif {
-            true => vec![
-                ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 0),
-                ("cavif -Q 90 -f -o", "avif", false, 40),
-            ],
-            false => vec![
-                ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 0),
-                ("cjxl -d 0 -j 0 -m 1 -e 7", "jxl", false, 0),
-                ("cjxl -d 1 -j 0 -m 0 -e 7", "jxl", false, 40),
-            ],
-        },
-        Format::Jpeg => match quality {
-            Some(q) if q < 90.0 => vec![
-                ("cjxl -d 0 -j 1 -m 0 -e 9", "jxl", false, 0),
-                ("cjxl -d 2 -j 0 -m 0 -e 7", "jxl", false, 0),
-            ],
-            _ => match avif {
-                true => vec![
-                    ("cjxl -d 0 -j 1 -m 0 -e 8", "jxl", false, 0),
-                    ("cavif -Q 90 -f -o", "avif", false, 32),
-                ],
-                false => vec![
-                    ("cjxl -d 0 -j 1 -m 0 -e 8", "jxl", false, 0),
-                    ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 10),
-                    ("cjxl -d 1 -j 0 -m 0 -e 7", "jxl", false, 32),
-                ],
-            },
-        },
-        Format::Webp => todo!(),
-    };
+    let cmds: Vec<_> = get_encode_settings(format, use_avif, quality);
 
     // ENCODE
     let (best, ext) = encode_and_get_best(&filepath, cmds)?;
@@ -201,14 +184,65 @@ pub fn process_image(
     Ok(())
 }
 
+// TODO size-dependent quality?
+fn get_encode_settings(
+    format: Format,
+    use_avif: bool,
+    quality: Option<f32>,
+) -> Vec<(&'static str, &'static str, bool, i32)> {
+    match format {
+        Format::Png => match use_avif {
+            true => vec![
+                ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 100),
+                ("cavif -Q 92 -f -o", "avif", false, 42),
+            ],
+            false => vec![
+                ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 100),
+                ("cjxl -d 0 -j 0 -m 1 -e 7", "jxl", false, 100),
+                ("cjxl -d 0.5 -j 0 -m 0 -e 7", "jxl", false, 60),
+            ],
+        },
+        Format::Jpeg => match quality {
+            Some(q) if q > 98.0 => match use_avif {
+                true => vec![
+                    ("cjxl -d 0 -j 1 -m 0 -e 8", "jxl", false, 100),
+                    ("cavif -Q 92 -f -o", "avif", false, 42),
+                ],
+                false => vec![
+                    ("cjxl -d 0 -j 1 -m 0 -e 8", "jxl", false, 100),
+                    ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 95),
+                    ("cjxl -d 0.5 -j 0 -m 0 -e 7", "jxl", false, 60),
+                ],
+            },
+
+            Some(q) if q < 90.0 => vec![
+                ("cjxl -d 0 -j 1 -m 0 -e 9", "jxl", false, 100),
+                ("cjxl -d 2 -j 0 -m 0 -e 7", "jxl", false, 30),
+            ],
+
+            _ => match use_avif {
+                true => vec![
+                    ("cjxl -d 0 -j 1 -m 0 -e 8", "jxl", false, 100),
+                    ("cavif -Q 90 -f -o", "avif", false, 42),
+                ],
+                false => vec![
+                    ("cjxl -d 0 -j 1 -m 0 -e 8", "jxl", false, 100),
+                    ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 95),
+                    ("cjxl -d 1 -j 0 -m 0 -e 7", "jxl", false, 60),
+                ],
+            },
+        },
+        Format::Webp => todo!(),
+    }
+}
+
 fn encode_and_get_best(
     input_path: &Path,
     cmds: Vec<(&str, &str, bool, i32)>,
 ) -> Result<(Vec<u8>, String), Box<dyn Error>> {
     let img_filesize = std::fs::metadata(input_path)?.len() as usize;
     let mut best = &ImageBuffer::default();
-    let mut best_filesize: usize = 0;
-    let mut best_percentage_of_original = 100;
+    let mut best_filesize: usize = img_filesize;
 
     let enc_img_buffers: Vec<ImageBuffer> = cmds
         .par_iter()
@@ -221,17 +255,17 @@ fn encode_and_get_best(
 
     for (i, buff) in enc_img_buffers.iter().enumerate() {
         let buff_filesize = buff.get_size();
-        let buff_percentage_of_original = (100 * buff_filesize / img_filesize) as i32;
+        let buff_percentage_of_best = (100 * buff_filesize / best_filesize) as i32;
         let better = buff_filesize != 0
             && buff_filesize < img_filesize
-            && (best_percentage_of_original - buff_percentage_of_original) > cmds[i].3;
+            && buff_percentage_of_best < cmds[i].3;
 
         let printing_status = format!(
             "{}\n{} --> {}\t{:6.2}% {is_better}\t{:>6.2}s",
             &buff.get_cmd(),
-            crate::cmds::byte2size(img_filesize as u64),
+            crate::cmds::byte2size(best_filesize as u64),
             crate::cmds::byte2size(buff_filesize as u64),
-            buff_percentage_of_original,
+            buff_percentage_of_best,
             &buff.duration.as_secs_f32(),
             is_better = if better { "* " } else { "" },
         );
@@ -240,11 +274,10 @@ fn encode_and_get_best(
         if better {
             best = buff;
             best_filesize = buff_filesize;
-            best_percentage_of_original = buff_percentage_of_original;
         }
     }
 
-    if best_filesize == 0 {
+    if best_filesize == img_filesize {
         return Ok((std::fs::read(input_path)?, "copy".to_string()));
     }
 
