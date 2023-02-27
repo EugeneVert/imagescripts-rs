@@ -29,10 +29,10 @@ pub struct Opt {
     /// Path to json file with cmds config
     #[arg(long)]
     cmds_config_json: Option<PathBuf>,
-    /// tolerance in % of original for saving results{n}
+    /// tolerance in % of best for saving results{n}
     /// (do nothing in case of saving all results)
-    #[arg(short, long, default_value = "10", allow_negative_numbers = true)]
-    tolerance: u16,
+    #[arg(short, long, num_args = 1.., default_value = "90", allow_negative_numbers = true)]
+    tolerance: Vec<u16>,
     /// save all encoded images (Not only the best compressed one)
     #[arg(long = "save")]
     save_all: bool,
@@ -52,10 +52,18 @@ pub struct Opt {
     nproc_cmd: Option<usize>,
 }
 
-pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
+pub fn main(mut opt: Opt) -> Result<(), Box<dyn Error>> {
     // if args.is_empty() {
     //     args = std::env::args_os().collect();
     // }
+
+    if opt.tolerance.len() != opt.cmds.len() {
+        if opt.tolerance.len() != 1 {
+            return Err("Incorrect number of tolerances".into());
+        }
+        opt.tolerance = vec![opt.tolerance[0]; opt.cmds.len()];
+    }
+
     let mut images = opt.input.to_owned();
     utils::ims_init(&mut images, &opt.out_dir, opt.nproc_cmd)?;
 
@@ -103,7 +111,7 @@ pub fn process_image(
     let img_filesize = img.metadata()?.len() as usize;
     let img_dimensions = image::image_dimensions(img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;
-    let tolerance = opt.tolerance; // %
+    let tolerance = &opt.tolerance; // %
     let out_dir = &opt.out_dir;
 
     // csv | open writer, push orig image filename&size
@@ -117,10 +125,6 @@ pub fn process_image(
         None
     };
 
-    let mut res_filesize: usize = 0;
-    let mut res_percentage_of_original = 100;
-
-    let mut res_buff = &ImageBuffer::default();
     // generate results in ImageBuffers for each cmd
     let enc_img_buffers: Vec<ImageBuffer> = opt
         .cmds
@@ -135,23 +139,26 @@ pub fn process_image(
         println!("{}", &img.display());
     }
 
+    let mut best = &ImageBuffer::default();
+    let mut best_filesize: usize = img_filesize;
+
     // Caclculate & print info for each ImageBuffer
     for (i, buff) in enc_img_buffers.iter().enumerate() {
         let buff_filesize = buff.get_size();
         let buff_bpp = (buff_filesize * 8) as f64 / px_count as f64;
-        let buff_percentage_of_original = (100 * buff_filesize / img_filesize) as i32;
+        let buff_percentage_of_best = (100 * buff_filesize / best_filesize) as i32;
         let better = buff_filesize != 0
             && buff_filesize < img_filesize
-            && (res_percentage_of_original - buff_percentage_of_original) > tolerance as i32;
+            && buff_percentage_of_best < tolerance[i] as i32;
 
         if !opt.no_progress {
             let printing_status = format!(
                 "{}\n{} --> {}\t{:6.2}bpp\t{:6.2}% {is_better}\t{:>6.2}s",
                 &buff.get_cmd(),
-                byte2size(img_filesize as u64),
+                byte2size(best_filesize as u64),
                 byte2size(buff_filesize as u64),
                 &buff_bpp,
-                buff_percentage_of_original,
+                buff_percentage_of_best,
                 &buff.duration.as_secs_f32(),
                 is_better = if better { "* " } else { "" },
             );
@@ -160,7 +167,7 @@ pub fn process_image(
 
         if opt.csv_save {
             csv_row[2 + i] = buff_filesize.to_string();
-            csv_row[2 + cmds_count + i] = buff_percentage_of_original.to_string();
+            csv_row[2 + cmds_count + i] = buff_percentage_of_best.to_string();
         }
 
         if opt.save_all {
@@ -182,9 +189,8 @@ pub fn process_image(
         }
 
         if better {
-            res_buff = buff;
-            res_filesize = buff_filesize;
-            res_percentage_of_original = buff_percentage_of_original;
+            best = buff;
+            best_filesize = buff_filesize;
         }
     }
 
@@ -198,7 +204,7 @@ pub fn process_image(
     }
 
     // save res_buf
-    if res_filesize == 0 {
+    if best_filesize == img_filesize {
         std::fs::copy(img, out_dir.join(img.file_name().unwrap()))?;
         if !opt.no_progress {
             println!("Save: Copy input");
@@ -211,17 +217,17 @@ pub fn process_image(
         img.file_stem()
             .and_then(OsStr::to_str)
             .ok_or_else(|| format!("No filestem: {}", img.display()))?,
-        &res_buff.extension
+        &best.extension
     ));
 
     let mut f = std::fs::File::create(save_path)?;
-    f.write_all(&res_buff.image)?;
+    f.write_all(&best.image)?;
     // if !opt.no_progress {
     //     println!("Save: {}", &res_buff.get_cmd());
     // }
     println!();
 
-    Ok(res_buff.get_cmd())
+    Ok(best.get_cmd())
 }
 
 #[derive(Default, Debug, Clone)]
