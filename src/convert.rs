@@ -32,6 +32,8 @@ pub struct Opt {
     no_monochrome_check: bool,
     #[arg(long)]
     no_resize: bool,
+    #[arg(short, long, default_value = "1.0")]
+    quality_multiplier: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -66,26 +68,35 @@ impl Format {
 }
 
 pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
-    process_image(
+    process_images(
         opt.input,
         opt.output,
-        opt.avif,
-        opt.manga,
-        opt.rename_original,
-        !opt.no_monochrome_check,
-        !opt.no_resize,
+        ConvertOptions {
+            use_avif: opt.avif,
+            manga_mode: opt.manga,
+            rename_original: opt.rename_original,
+            monochrome_check: !opt.no_monochrome_check,
+            resize: !opt.no_resize,
+            quality_multiplier: opt.quality_multiplier,
+        },
     )?;
     Ok(())
 }
 
-pub fn process_image(
+#[derive(Debug)]
+pub struct ConvertOptions {
+    pub use_avif: bool,
+    pub manga_mode: Option<u8>,
+    pub rename_original: bool,
+    pub monochrome_check: bool,
+    pub resize: bool,
+    pub quality_multiplier: f32,
+}
+
+pub fn process_images(
     input_path: PathBuf,
     output_path: PathBuf,
-    use_avif: bool,
-    manga_mode: Option<u8>,
-    rename_original: bool,
-    monochrome_check: bool,
-    resize: bool,
+    options: ConvertOptions,
 ) -> Result<(), Box<dyn Error>> {
     // LOAD
     let mut format = Format::from_file_format(&input_path).ok_or("Can't parse image format")?;
@@ -107,7 +118,7 @@ pub fn process_image(
     let size = img.dimensions();
     let filepath;
     let mut tmp1 = None;
-    if resize && (size.0 > 3508 || size.1 > 3508) && quality.unwrap_or(100.0) > 90.0 {
+    if options.resize && (size.0 > 3508 || size.1 > 3508) && quality.unwrap_or(100.0) > 90.0 {
         tmp1 = Some(tempfile::Builder::new().suffix(".png").tempfile()?);
         let tmp_path1 = tmp1.as_ref().unwrap().path().to_path_buf();
         img = img.resize(3508, 3508, image::imageops::FilterType::Lanczos3);
@@ -120,12 +131,12 @@ pub fn process_image(
     }
 
     // PROCESS MANGA
-    if manga_mode.is_some() {
+    if options.manga_mode.is_some() {
         return process_manga_image(img, filepath, format);
     }
 
     // MONOCHROME
-    let monochrome_mse = if monochrome_check {
+    let monochrome_mse = if options.monochrome_check {
         image_is_monochrome(&img, false)
     } else {
         f32::INFINITY
@@ -142,13 +153,18 @@ pub fn process_image(
     );
 
     // ENCODE SETTINGS
-    let cmds: Vec<_> = get_encode_settings(format, use_avif, quality);
+    let cmds: Vec<_> = get_encode_settings(
+        format,
+        options.use_avif,
+        quality,
+        options.quality_multiplier,
+    );
 
     // ENCODE
     let (best, ext) = encode_and_get_best(&filepath, cmds)?;
 
     // BACKUP
-    if rename_original {
+    if options.rename_original {
         std::fs::rename(
             &input_path,
             input_path.with_file_name(
@@ -185,50 +201,56 @@ pub fn process_image(
 }
 
 // TODO size-dependent quality?
-fn get_encode_settings(
+fn get_encode_settings<'a>(
     format: Format,
     use_avif: bool,
-    quality: Option<f32>,
-) -> Vec<(&'static str, &'static str, bool, i32)> {
+    jpg_quality: Option<f32>,
+    quality_multiplier: f32,
+) -> Vec<(String, &'a str, bool, i32)> {
+    let avif_quality = (16.0 * quality_multiplier).round() as i8;
+    let avif_low_quality = (21.0 * quality_multiplier).round() as i8;
+    let cjxl_quality = 0.7 * quality_multiplier;
+    let cjxl_normal_quality = 1.0 * quality_multiplier;
+    let cjxl_low_quality = 2.0 * quality_multiplier;
     match format {
         Format::Png => match use_avif {
             true => vec![
-                ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 100),
-                ("cavif -Q 92 -f -o", "avif", false, 42),
+                (cjxl_l(4), "jxl", false, 100),
+                (avifenc_q(avif_quality), "avif", false, 42),
             ],
             false => vec![
-                ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 100),
-                ("cjxl -d 0 -j 0 -m 1 -e 7", "jxl", false, 100),
-                ("cjxl -d 0.5 -j 0 -m 0 -e 7", "jxl", false, 60),
+                (cjxl_l(4), "jxl", false, 100),
+                (cjxl_l(7), "jxl", false, 100),
+                (cjxl_d(cjxl_quality), "jxl", false, 60),
             ],
         },
-        Format::Jpeg => match quality {
+        Format::Jpeg => match jpg_quality {
             Some(q) if q > 98.0 => match use_avif {
                 true => vec![
-                    ("cjxl -d 0 -j 1 -m 0 -e 8", "jxl", false, 100),
-                    ("cavif -Q 92 -f -o", "avif", false, 42),
+                    (cjxl_tr(8), "jxl", false, 100),
+                    (avifenc_q(avif_quality), "avif", false, 42),
                 ],
                 false => vec![
-                    ("cjxl -d 0 -j 1 -m 0 -e 8", "jxl", false, 100),
-                    ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 95),
-                    ("cjxl -d 0.5 -j 0 -m 0 -e 7", "jxl", false, 60),
+                    (cjxl_tr(8), "jxl", false, 100),
+                    (cjxl_l(4), "jxl", false, 95),
+                    (cjxl_d(cjxl_quality), "jxl", false, 60),
                 ],
             },
 
             Some(q) if q < 90.0 => vec![
-                ("cjxl -d 0 -j 1 -m 0 -e 9", "jxl", false, 100),
-                ("cjxl -d 2 -j 0 -m 0 -e 7", "jxl", false, 30),
+                (cjxl_tr(9), "jxl", false, 100),
+                (cjxl_d(cjxl_low_quality), "jxl", false, 30),
             ],
 
             _ => match use_avif {
                 true => vec![
-                    ("cjxl -d 0 -j 1 -m 0 -e 8", "jxl", false, 100),
-                    ("cavif -Q 90 -f -o", "avif", false, 42),
+                    (cjxl_tr(8), "jxl", false, 100),
+                    (avifenc_q(avif_low_quality), "avif", false, 42),
                 ],
                 false => vec![
-                    ("cjxl -d 0 -j 1 -m 0 -e 8", "jxl", false, 100),
-                    ("cjxl -d 0 -j 0 -m 1 -e 4", "jxl", false, 95),
-                    ("cjxl -d 1 -j 0 -m 0 -e 7", "jxl", false, 60),
+                    (cjxl_tr(8), "jxl", false, 100),
+                    (cjxl_l(4), "jxl", false, 95),
+                    (cjxl_d(cjxl_normal_quality), "jxl", false, 60),
                 ],
             },
         },
@@ -236,9 +258,27 @@ fn get_encode_settings(
     }
 }
 
+fn cjxl_l(effort: i8) -> String {
+    format!("cjxl -d 0 -j -0 -m 1 -e {}", effort)
+}
+
+fn cjxl_d(distance: f32) -> String {
+    const CJXL_SPEED: i8 = 7;
+    format!("cjxl -d {} -j 0 -m 0 -e {}", distance, CJXL_SPEED)
+}
+
+fn cjxl_tr(effort: i8) -> String {
+    format!("cjxl -d 0 -j 1 -m 0 -e {}", effort)
+}
+
+fn avifenc_q(quality: i8) -> String {
+    const AVIFENC_SPEED: i8 = 4;
+    format!("avifenc --min 0 --max 63 -d 10 -s {} -j 8 -a end-usage=q -a cq-level={} -a color:enable-chroma-deltaq=1 -a color:deltaq-mode=3 -a tune=ssim", AVIFENC_SPEED, quality)
+}
+
 fn encode_and_get_best(
     input_path: &Path,
-    cmds: Vec<(&str, &str, bool, i32)>,
+    cmds: Vec<(String, &str, bool, i32)>,
 ) -> Result<(Vec<u8>, String), Box<dyn Error>> {
     let img_filesize = std::fs::metadata(input_path)?.len() as usize;
     let mut best = &ImageBuffer::default();
@@ -247,7 +287,7 @@ fn encode_and_get_best(
     let enc_img_buffers: Vec<ImageBuffer> = cmds
         .par_iter()
         .map(|cmd| {
-            let mut buff = ImageBuffer::new(cmd.0, cmd.1, cmd.2);
+            let mut buff = ImageBuffer::new(&cmd.0, cmd.1, cmd.2);
             buff.image_generate(input_path).map(|_| buff)
         })
         .collect::<Result<_, _>>()
