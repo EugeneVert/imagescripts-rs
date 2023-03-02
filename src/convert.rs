@@ -22,17 +22,17 @@ use crate::jpegquality::jpeg_quality;
 pub struct Opt {
     input: PathBuf,
     output: PathBuf,
-    #[arg(short, long)]
+    #[arg(short = 'a', long)]
     avif: bool,
     #[arg(short, long)]
     manga: Option<u8>,
-    #[arg(short, long)]
+    #[arg(short = 'r', long)]
     rename_original: bool,
-    #[arg(long)]
+    #[arg(short = 'm', long)]
     no_monochrome_check: bool,
-    #[arg(long)]
-    no_resize: bool,
-    #[arg(short, long, default_value = "1.0")]
+    #[arg(short = 's', long, default_value = "3508")]
+    resize: u32,
+    #[arg(short = 'q', long, default_value = "1.0")]
     quality_multiplier: f32,
 }
 
@@ -76,7 +76,7 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
             manga_mode: opt.manga,
             rename_original: opt.rename_original,
             monochrome_check: !opt.no_monochrome_check,
-            resize: !opt.no_resize,
+            resize: opt.resize,
             quality_multiplier: opt.quality_multiplier,
         },
     )?;
@@ -89,7 +89,7 @@ pub struct ConvertOptions {
     pub manga_mode: Option<u8>,
     pub rename_original: bool,
     pub monochrome_check: bool,
-    pub resize: bool,
+    pub resize: u32,
     pub quality_multiplier: f32,
 }
 
@@ -118,14 +118,21 @@ pub fn process_images(
     let size = img.dimensions();
     let filepath;
     let mut tmp1 = None;
-    if options.resize && (size.0 > 3508 || size.1 > 3508) && quality.unwrap_or(100.0) > 90.0 {
+    if options.resize != 0
+        && (size.0 > options.resize || size.1 > options.resize)
+        && quality.unwrap_or(100.0) > 90.0
+    {
         tmp1 = Some(tempfile::Builder::new().suffix(".png").tempfile()?);
         let tmp_path1 = tmp1.as_ref().unwrap().path().to_path_buf();
-        img = img.resize(3508, 3508, image::imageops::FilterType::Lanczos3);
+        img = img.resize(
+            options.resize,
+            options.resize,
+            image::imageops::FilterType::Lanczos3,
+        );
         img.save(&tmp_path1)?;
         format = Format::Png;
         filepath = tmp_path1;
-        println!("resized to 3508");
+        println!("resized to {}", options.resize);
     } else {
         filepath = input_path.clone();
     }
