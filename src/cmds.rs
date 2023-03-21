@@ -109,8 +109,6 @@ pub fn process_image(
     settings: &HashMap<String, EncodeSetting>,
 ) -> Result<String, Box<dyn Error + Send + Sync>> {
     let img_filesize = img.metadata()?.len() as usize;
-    let img_dimensions = image::image_dimensions(img)?;
-    let px_count = img_dimensions.0 * img_dimensions.1;
     let tolerance = &opt.tolerance; // %
     let out_dir = &opt.out_dir;
 
@@ -145,7 +143,6 @@ pub fn process_image(
     // Caclculate & print info for each ImageBuffer
     for (i, buff) in enc_img_buffers.iter().enumerate() {
         let buff_filesize = buff.get_size();
-        let buff_bpp = (buff_filesize * 8) as f64 / px_count as f64;
         let buff_percentage_of_best = (100 * buff_filesize / best_filesize) as i32;
         let better = buff_filesize != 0
             && buff_filesize < img_filesize
@@ -153,14 +150,13 @@ pub fn process_image(
 
         if !opt.no_progress {
             let printing_status = format!(
-                "{}\n{} --> {}\t{:6.2}bpp\t{:6.2}% {is_better}\t{:>6.2}s",
-                &buff.get_cmd(),
+                "{:>9} --> {:<9}{:4.2}% {is_better}\t{:>6.2}s\t{cmd}",
                 byte2size(best_filesize as u64),
                 byte2size(buff_filesize as u64),
-                &buff_bpp,
                 buff_percentage_of_best,
                 &buff.duration.as_secs_f32(),
                 is_better = if better { "* " } else { "" },
+                cmd = &buff.get_cmd(),
             );
             println!("{}", printing_status);
         }

@@ -308,13 +308,13 @@ fn encode_and_get_best(
             && buff_percentage_of_best < cmds[i].3;
 
         let printing_status = format!(
-            "{}\n{} --> {}\t{:6.2}% {is_better}\t{:>6.2}s",
-            &buff.get_cmd(),
+            "{:>9} --> {:<9}{:4.2}% {is_better}\t{:>6.2}s\t{cmd}",
             crate::cmds::byte2size(best_filesize as u64),
             crate::cmds::byte2size(buff_filesize as u64),
             buff_percentage_of_best,
             &buff.duration.as_secs_f32(),
             is_better = if better { "* " } else { "" },
+            cmd = &buff.get_cmd(),
         );
         println!("{}", printing_status);
 
