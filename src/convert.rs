@@ -214,33 +214,32 @@ fn get_encode_settings<'a>(
     jpg_quality: Option<f32>,
     quality_multiplier: f32,
 ) -> Vec<(String, &'a str, bool, i32)> {
-    let avif_quality = (16.0 * quality_multiplier).round() as i8;
+    let avif_normal_quality = (16.0 * quality_multiplier).round() as i8;
     let avif_low_quality = (21.0 * quality_multiplier).round() as i8;
-    let cjxl_quality = 0.7 * quality_multiplier;
+    let cjxl_hi_quality = 0.7 * quality_multiplier;
     let cjxl_normal_quality = 1.0 * quality_multiplier;
     let cjxl_low_quality = 2.0 * quality_multiplier;
     match format {
         Format::Png => match use_avif {
             true => vec![
-                (cjxl_l(4), "jxl", false, 100),
-                (avifenc_q(avif_quality), "avif", false, 42),
+                (cjxl_le(7), "jxl", false, 100),
+                (avifenc_q(avif_normal_quality), "avif", false, 42),
             ],
             false => vec![
-                (cjxl_l(4), "jxl", false, 100),
-                (cjxl_l(7), "jxl", false, 100),
-                (cjxl_d(cjxl_quality), "jxl", false, 60),
+                (cjxl_le(7), "jxl", false, 100),
+                (cjxl_d(cjxl_hi_quality), "jxl", false, 60),
             ],
         },
         Format::Jpeg => match jpg_quality {
             Some(q) if q > 98.0 => match use_avif {
                 true => vec![
                     (cjxl_tr(8), "jxl", false, 100),
-                    (avifenc_q(avif_quality), "avif", false, 42),
+                    (avifenc_q(avif_normal_quality), "avif", false, 42),
                 ],
                 false => vec![
                     (cjxl_tr(8), "jxl", false, 100),
-                    (cjxl_l(4), "jxl", false, 95),
-                    (cjxl_d(cjxl_quality), "jxl", false, 60),
+                    (cjxl_le(7), "jxl", false, 95),
+                    (cjxl_d(cjxl_hi_quality), "jxl", false, 50),
                 ],
             },
 
@@ -256,8 +255,8 @@ fn get_encode_settings<'a>(
                 ],
                 false => vec![
                     (cjxl_tr(8), "jxl", false, 100),
-                    (cjxl_l(4), "jxl", false, 95),
-                    (cjxl_d(cjxl_normal_quality), "jxl", false, 60),
+                    (cjxl_le(7), "jxl", false, 95),
+                    (cjxl_d(cjxl_normal_quality), "jxl", false, 50),
                 ],
             },
         },
@@ -265,20 +264,24 @@ fn get_encode_settings<'a>(
     }
 }
 
-fn cjxl_l(effort: i8) -> String {
-    format!("cjxl -d 0 -j -0 -m 1 -e {}", effort)
+pub fn cjxl_l(effort: i8) -> String {
+    format!("cjxl -d 0 -j -0 -m 1 -e {} --patches=0", effort)
 }
 
-fn cjxl_d(distance: f32) -> String {
+pub fn cjxl_d(distance: f32) -> String {
     const CJXL_SPEED: i8 = 7;
-    format!("cjxl -d {} -j 0 -m 0 -e {}", distance, CJXL_SPEED)
+    format!("cjxl -d {} -j 0 -m 0 -e {} --patches=0", distance, CJXL_SPEED)
 }
 
-fn cjxl_tr(effort: i8) -> String {
+pub fn cjxl_tr(effort: i8) -> String {
     format!("cjxl -d 0 -j 1 -m 0 -e {}", effort)
 }
 
-fn avifenc_q(quality: i8) -> String {
+pub fn cjxl_le(effort: i8) -> String {
+    format!("cjxl -d 0 -j 0 -e {} -m 1 -I 1 -E 3 --patches=0", effort)
+}
+
+pub fn avifenc_q(quality: i8) -> String {
     const AVIFENC_SPEED: i8 = 4;
     format!("avifenc --min 0 --max 63 -d 10 -s {} -j 8 -a end-usage=q -a cq-level={} -a color:enable-chroma-deltaq=1 -a color:deltaq-mode=3 -a tune=ssim", AVIFENC_SPEED, quality)
 }

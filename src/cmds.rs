@@ -357,16 +357,24 @@ r#"{
     "encode": "cjxl -d 0 -j 0 -e %1% --patches=0",
     "ext": "jxl"
   },
+  "cjxl_le": {
+    "encode": "cjxl -d 0 -j 0 -e %1% -m 1 -I 1 -E 3 --patches=0",
+    "ext": "jxl"
+  },
   "cjxl_tr": {
     "encode": "cjxl -d 0 -j 1 -e %1%",
     "ext": "jxl"
   },
   "cavif_q": {
-    "encode": "cavif -Q %1%",
+    "encode": "cavif -Q %1% -f -o",
     "ext": "avif"
   },
   "avif_q": {
-    "encode": "avifenc --min 0 --max 63 -d 10 -s 4 -j 8 -a end-usage=q -a cq-level=%1% -a color:enable-chroma-deltaq=1 -a color:deltaq-mode=3 -a color:aq-mode=1 -a color:qm-min=0 -a tune=ssim",
+    "encode": "avifenc --min 0 --max 63 -d 10 -s %1% -j 8 -a end-usage=q -a cq-level=%2% -a color:enable-chroma-deltaq=1 -a color:deltaq-mode=3 -a tune=ssim",
+    "ext": "avif"
+  },
+  "avif8_q": {
+    "encode": "avifenc --min 0 --max 63 -d 8 -s %1% -j 8 -a end-usage=q -a cq-level=%2% -a color:enable-chroma-deltaq=1 -a color:deltaq-mode=3 -a tune=butteraugli",
     "ext": "avif"
   }
 }"#.as_bytes()
