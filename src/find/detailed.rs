@@ -10,7 +10,6 @@ use image::{
 // use imageproc::definitions::Image;
 
 #[derive(Args, Debug, Clone)]
-#[command(about = "Program for finding images without clean lines")]
 pub struct Opt {
     /// input file
     #[arg(short)]

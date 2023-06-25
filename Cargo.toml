@@ -13,7 +13,7 @@ rayon = "1.7"
 
 csv = "1.1"
 dirs = "5.0"
-image = "0.24"
+image = { version = "0.24", default-features = false, features = ["png", "jpeg", "jpeg_rayon", "pnm", "bmp", "webp"]}
 image_hasher = "1.0"
 imageproc = "0.23"
 serde = "1.0"

@@ -27,12 +27,8 @@ pub struct Opt {
 }
 
 pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
-    // if args.is_empty() {
-    //     args = std::env::args_os().collect();
-    // }
     let out_dir = std::path::PathBuf::from(unwrap_two(opt.lesser, opt.greater).to_string());
-    let mut images = opt.input.to_owned();
-    utils::ims_init(&mut images, &out_dir, Some(opt.nproc))?;
+    let images = utils::ims_init(&opt.input, &out_dir, Some(opt.nproc))?;
 
     images
         .iter()

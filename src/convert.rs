@@ -214,8 +214,8 @@ fn get_encode_settings<'a>(
     jpg_quality: Option<f32>,
     quality_multiplier: f32,
 ) -> Vec<(String, &'a str, bool, i32)> {
-    let avif_normal_quality = (16.0 * quality_multiplier).round() as i8;
-    let avif_low_quality = (21.0 * quality_multiplier).round() as i8;
+    let avif_normal_quality = (16.0 * quality_multiplier + 0.5) as i8;
+    let avif_low_quality = (21.0 * quality_multiplier + 0.5) as i8;
     let cjxl_hi_quality = 0.7 * quality_multiplier;
     let cjxl_normal_quality = 1.0 * quality_multiplier;
     let cjxl_low_quality = 2.0 * quality_multiplier;
@@ -270,7 +270,10 @@ pub fn cjxl_l(effort: i8) -> String {
 
 pub fn cjxl_d(distance: f32) -> String {
     const CJXL_SPEED: i8 = 7;
-    format!("cjxl -d {} -j 0 -m 0 -e {} --patches=0", distance, CJXL_SPEED)
+    format!(
+        "cjxl -d {} -j 0 -m 0 -e {} --patches=0",
+        distance, CJXL_SPEED
+    )
 }
 
 pub fn cjxl_tr(effort: i8) -> String {
@@ -439,17 +442,3 @@ fn jpegtran_grayscale(filepath: &Path, save_path: &Path) -> Result<DynamicImage,
     // }
     image::load_from_memory_with_format(&p.stdout, image::ImageFormat::Jpeg).map_err(|e| e.into())
 }
-
-// fn get_tmp_path(format: &Format) -> PathBuf {
-//     let tmpdir = std::env::temp_dir().join("ims-rs-convert");
-//     mkdir(&tmpdir).unwrap();
-//     let nanos_rng = (std::time::SystemTime::now()
-//         .duration_since(std::time::UNIX_EPOCH)
-//         .unwrap()
-//         .subsec_nanos())
-//     .to_string();
-//     let tmp_filename = nanos_rng + format.as_ext();
-//     let tmp_filepath = tmpdir.join(tmp_filename);
-//     println!("{}", tmp_filepath.display());
-//     tmp_filepath
-// }

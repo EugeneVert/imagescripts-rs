@@ -12,8 +12,8 @@ pub fn jpeg_quality(filepath: &Path) -> Result<f32, Box<dyn Error>> {
     let mut reader = std::io::BufReader::new(file).bytes();
 
     let mut header = [0; 15];
-    for i in 0..2 {
-        header[i] = reader.next().unwrap()?;
+    for h in &mut header {
+        *h = reader.next().unwrap()?;
     }
 
     if (header[0] != 0xFF) || (header[1] != 0xD8) {
@@ -79,8 +79,8 @@ pub fn jpeg_quality(filepath: &Path) -> Result<f32, Box<dyn Error>> {
             }
 
             if index > 0 {
-                let mut diff = (quality_avg[0] - quality_avg[1]).abs() * 0.49;
-                diff += (quality_avg[0] - quality_avg[2]).abs() * 0.49;
+                let diff = (quality_avg[0] - quality_avg[1]).abs() * 0.49
+                    + (quality_avg[0] - quality_avg[2]).abs() * 0.49;
                 let quality_f = (quality_avg[0] + quality_avg[1] + quality_avg[2]) / 3.0 + diff;
                 // println!("Average quality: {}", quality_f);
                 return Ok(quality_f);
@@ -118,7 +118,3 @@ fn read_b2(reader: &mut Bytes<BufReader<File>>, b1: &mut u8, b2: &mut u8) -> std
     }
     Ok(*b1 as u32 * 256 + *b2 as u32)
 }
-
-// fn main() {
-//     dbg!(jpeg_quality(Path::new("1.jpg")).unwrap());
-// }

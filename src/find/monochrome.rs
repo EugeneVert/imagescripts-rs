@@ -32,8 +32,7 @@ pub struct Opt {
 }
 
 pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
-    let mut images = opt.input.to_owned();
-    utils::ims_init(&mut images, opt.out_dir.as_path(), Some(opt.nproc))?;
+    let images = utils::ims_init(&opt.input, opt.out_dir.as_path(), Some(opt.nproc))?;
 
     images.iter().par_bridge().for_each(|img| {
         process_image(img, opt.out_dir.as_path(), &opt)

@@ -27,10 +27,7 @@ pub struct Opt {
 
 pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     let out_dir = Path::new("./").join(opt.px_size.to_string());
-
-    let mut images = opt.input.to_owned();
-    utils::ims_init(&mut images, &out_dir, Some(opt.nproc))?;
-
+    let images = utils::ims_init(&opt.input, &out_dir, Some(opt.nproc))?;
     let images_to_mv = get_images_to_mv(&images, &opt);
 
     if images_to_mv.is_empty() {

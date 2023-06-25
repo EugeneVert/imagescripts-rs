@@ -53,19 +53,17 @@ pub struct Opt {
 }
 
 pub fn main(mut opt: Opt) -> Result<(), Box<dyn Error>> {
-    // if args.is_empty() {
-    //     args = std::env::args_os().collect();
-    // }
-
     if opt.tolerance.len() != opt.cmds.len() {
         if opt.tolerance.len() != 1 {
-            return Err("Incorrect number of tolerances".into());
+            return Err("Incorrect number of tolerances \
+                (Set tolerance for all cmds (1 argument) \
+                or for each cmd (n arguments))"
+                .into());
         }
         opt.tolerance = vec![opt.tolerance[0]; opt.cmds.len()];
     }
 
-    let mut images = opt.input.to_owned();
-    utils::ims_init(&mut images, &opt.out_dir, opt.nproc_cmd)?;
+    let images = utils::ims_init(&opt.input, &opt.out_dir, opt.nproc_cmd)?;
 
     // write csv header with cmds
     if opt.csv_save {

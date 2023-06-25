@@ -65,8 +65,8 @@ pub struct Opt {
 pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     let mut images = opt.input.to_owned();
     if images[0].to_string_lossy() == "./*" {
-        utils::input_get_from_cwd(&mut images)?;
-        utils::input_filter_images(&mut images);
+        images = utils::read_cwd()?;
+        utils::filter_images(&mut images);
         images.sort_unstable()
     }
 
