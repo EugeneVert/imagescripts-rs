@@ -363,6 +363,14 @@ r#"{
     "encode": "cjxl -d 0 -j 1 -e %1%",
     "ext": "jxl"
   },
+  "cjpegli": {
+    "encode": "cjpegli -d %1%",
+    "ext": "jpg"
+  },
+  "cjpegli420": {
+    "encode": "cjpegli -d %1% --chroma_subsampling=420",
+    "ext": "jpg"
+  },
   "cavif_q": {
     "encode": "cavif -Q %1% -f -o",
     "ext": "avif"
