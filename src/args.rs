@@ -3,7 +3,6 @@ use clap::{Parser, Subcommand};
 use crate::*;
 
 #[derive(Parser, Clone, Debug)]
-#[command(disable_help_flag(true))]
 pub struct Opt {
     #[command(subcommand)]
     pub subcommand: Commands,

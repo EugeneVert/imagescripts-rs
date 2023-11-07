@@ -1,10 +1,3 @@
-// NOTE Q: what about digikam output filename extension? A: Rename images in digikam using dk-album-manage
-// DONE replace get_temp_path with Temp crate or delete them mannualy
-// DONE jpeg quality estimation (then convert cjxl_tr(7), cjxl_d(2))
-// DONE resize
-// TODO what to do with webp? cjxl/avifenc does't support it
-// TODO implement manga mode
-
 use std::path::Path;
 use std::{error::Error, path::PathBuf};
 
@@ -230,35 +223,37 @@ fn get_encode_settings<'a>(
                 (cjxl_d(cjxl_hi_quality), "jxl", false, 60),
             ],
         },
-        Format::Jpeg => match jpg_quality {
-            Some(q) if q > 98.0 => match use_avif {
-                true => vec![
-                    (cjxl_tr(8), "jxl", false, 100),
+        Format::Jpeg => match (jpg_quality, use_avif) {
+            (Some(q), true) if q > 98.0 => {
+                vec![
+                    (cjxl_tr(7), "jxl", false, 100),
                     (avifenc_q(avif_normal_quality), "avif", false, 42),
-                ],
-                false => vec![
-                    (cjxl_tr(8), "jxl", false, 100),
+                ]
+            }
+            (Some(q), false) if q > 98.0 => {
+                vec![
+                    (cjxl_tr(7), "jxl", false, 100),
                     (cjxl_le(7), "jxl", false, 95),
                     (cjxl_d(cjxl_hi_quality), "jxl", false, 50),
-                ],
-            },
-
-            Some(q) if q < 90.0 => vec![
+                ]
+            }
+            (Some(q), _) if q < 90.0 => vec![
                 (cjxl_tr(9), "jxl", false, 100),
                 (cjxl_d(cjxl_low_quality), "jxl", false, 30),
             ],
-
-            _ => match use_avif {
-                true => vec![
-                    (cjxl_tr(8), "jxl", false, 100),
+            (_, true) => {
+                vec![
+                    (cjxl_tr(7), "jxl", false, 100),
                     (avifenc_q(avif_low_quality), "avif", false, 42),
-                ],
-                false => vec![
-                    (cjxl_tr(8), "jxl", false, 100),
+                ]
+            }
+            (_, false) => {
+                vec![
+                    (cjxl_tr(7), "jxl", false, 100),
                     (cjxl_le(7), "jxl", false, 95),
                     (cjxl_d(cjxl_normal_quality), "jxl", false, 50),
-                ],
-            },
+                ]
+            }
         },
         Format::Webp => todo!(),
     }
