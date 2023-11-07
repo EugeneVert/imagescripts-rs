@@ -22,17 +22,17 @@ A collection of modules for image gallery manipulations, such as: creating anima
 
 ### Find images with desired bpp (`bpp`)
 
-Find images that have a bpp value less/greater than the target value. There is also a custom metric behind the `-m` switch: `bpp + px_count / 2048^2`
+Moves images that have a bpp value less/greater than the target value.
 
 **Example**
 
 ```bash
-ims-rs find bpp -m -l 3.5
+ims-rs find bpp -l 3.5
 ```
 
 ### Find Monochrome images (`monochrome`)
 
-Checks if the image is monochrome by computing Mean Squared Error (x100) from mean hue bias by converting each pixel of the thumbnailed image to hsv
+Moves image if it's monochrome by computing Mean Squared Error (x100) from mean hue bias by converting each pixel of the thumbnailed image to hsv
 
 **Example**
 
@@ -43,24 +43,24 @@ ims-rs find monochrome --nproc 16 -t 1000 -o "./maybe_monochrome"
 
 ### Find images by dimmensions (`resizable`)
 
-Find 'resizable' images with any dimmension larger than the target size, with possible `.png` separation.  
+Moves 'resizable' images with any dimmension larger than the target size.  
 Default target: 3508px
 
 **Example**
 
 ```bash
-ims-rs find resizable -s 4961 --p --keep-empty
+ims-rs find resizable -s 4961 --keep-empty
 ```
 
 ### Find similar images (`similar`)
 
-Find similar images using image hashes
+Moves similar images using image hashes
 
 ## Animation / Slideshow creation (`gen`)
 
 ### Slideshow from images in folder (`video`)
 
-Creates slideshow (default fps: `-r 2`). The video dimmension based on average image size.
+Creates slideshow. The video dimmension based on average image size.
 
 **Example:**
 
@@ -105,32 +105,34 @@ ims-rs gen zip2video *.zip
 
 ## Image encoders comparison (`cmds`)
 
-Supports output to cli/csv  
-In commands in place of `:` use `\.`
+Utility for codecs/parameters comarison
 
 **Example:**
 
 ```bash
-ims-rs cmds --csv -c \
-    "avifenc:--min 0 --max 63 -d 10 -s 6 -j 8 -a end-usage=q -a cq-level=16 -a color\.enable-chroma-deltaq=1" \
-    "cjxl:-d 1 --num_threads=0" \
-    "cjxl:-d 0 -j -m --num_threads=0" -- ./1.png
+ims-rs cmds --csv --save -c "avif_q(4,14)" "cjxl_d(0.7)" "cjxl_l(7)"
 ```
 
 **Example output:**
 
 ```bash
-avifenc --min 0 --max 63 -d 10 -s 6 -j 8 -a end-usage=q -a cq-level=16 -a color:enable-chroma-deltaq=1
-992.1KiB --> 334.4KiB     0.42bpp       33% *     9.61s
-cjxl -d 1 --num_threads=0
-992.1KiB --> 1.1MiB       1.37bpp       109%      3.64s
-cjxl -d 0 -j -m --num_threads=0
-992.1KiB --> 630.9KiB     0.79bpp       63%       7.49s
+./test1.png
+  26.9KiB --> 19.4KiB    72% *    0.11s avifenc ...
+  19.4KiB --> 45.2KiB   233%      0.03s cjxl -d 0.7 -j 0
+  19.4KiB --> 12.9KiB    66% *    0.03s cjxl -d 0 -j 0 -e 7
 
-Save: avifenc --min 0 --max 63 -d 10 -s 6 -j 8 -a end-usage=q -a cq-level=16 -a color:enable-chroma-deltaq=1
+./test2.png
+ 254.4KiB --> 91.5KiB    35% *    4.54s avifenc ...
+  91.5KiB --> 304.9KiB  333%      0.22s cjxl -d 0.7 -j 0
+  91.5KiB --> 298.7KiB  326%      0.55s cjxl -d 0 -j 0 -e 7
+
+./test3.png
+  21.3KiB --> 6.1KiB     28% *    0.10s avifenc ...
+   6.1KiB --> 13.2KiB   215%      0.03s cjxl -d 0.7 -j 0
+   6.1KiB --> 11.2KiB   182%      0.04s cjxl -d 0 -j 0 -e 7
 
 stats: 
 count    cmd
-1        avifenc --min 0 --max 63 -d 10 -s 6 -j 8 -a end-usage=q -a cq-level=16 -a color:enable-chroma-deltaq=1
+2        avifenc ...
+1        cjxl -d 0 -j 0 -e 7
 ```
-
