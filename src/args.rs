@@ -20,6 +20,7 @@ pub enum Commands {
     },
     Cmds(cmds::Opt),
     Convert(convert::Opt),
+    IsApng(is_apng::Opt),
     ShellCompletions,
 }
 

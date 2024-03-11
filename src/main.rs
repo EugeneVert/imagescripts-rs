@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
         args::Commands::Cmds(opt) => cmds::main(opt)?,
         args::Commands::Convert(opt) => convert::main(opt)?,
+        args::Commands::IsApng(opt) => is_apng::main(opt)?,
         args::Commands::ShellCompletions => gen_shell_completions()?,
     }
     Ok(())
