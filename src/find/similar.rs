@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    error::Error,
     fs::File,
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
@@ -12,7 +11,10 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use zip::write::FileOptions;
 
-use crate::utils::{self, mkdir};
+use crate::{
+    utils::{self, mkdir},
+    BResult,
+};
 
 #[rustfmt::skip]
 #[derive(Args, Debug, Clone)]
@@ -33,7 +35,7 @@ struct JsonData {
     map: HashMap<String, String>,
 }
 
-pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
+pub fn main(opt: Opt) -> BResult<()> {
     let mut images = opt.input.to_owned();
     if images[0].to_string_lossy() == "./*" {
         images = utils::read_cwd()?;
@@ -88,7 +90,7 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
 fn load_map(
     storage: &Option<PathBuf>,
     map: &mut Arc<RwLock<HashMap<String, String>>>,
-) -> Result<(), Box<dyn Error>> {
+) -> BResult<()> {
     if let Some(ref storage) = storage {
         if storage.exists() {
             let fr = File::open(storage)?;
@@ -101,10 +103,7 @@ fn load_map(
     Ok(())
 }
 
-fn save_map(
-    storage: &Option<PathBuf>,
-    map: Arc<RwLock<HashMap<String, String>>>,
-) -> Result<(), Box<dyn Error>> {
+fn save_map(storage: &Option<PathBuf>, map: Arc<RwLock<HashMap<String, String>>>) -> BResult<()> {
     if let Some(ref storage) = storage {
         let fw = File::create(storage)?;
         let mut fz = zip::write::ZipWriter::new(fw);
@@ -170,7 +169,7 @@ fn gen_hash(
     img: &Path,
     map: Arc<RwLock<HashMap<String, String>>>,
     hasher: &Hasher,
-) -> Result<ImageHash, Box<dyn Error>> {
+) -> BResult<ImageHash> {
     let hash: ImageHash;
     let filename = img.file_name().unwrap().to_str().unwrap();
 
@@ -196,7 +195,7 @@ fn gen_hash(
     Ok(hash)
 }
 
-fn image_jxl_decode(i: &Path) -> Result<tempfile::NamedTempFile, Box<dyn Error>> {
+fn image_jxl_decode(i: &Path) -> BResult<tempfile::NamedTempFile> {
     let tf_out = tempfile::Builder::new().suffix(".png").tempfile()?;
     let outp = std::process::Command::new("djxl")
         .arg(i)
@@ -206,7 +205,7 @@ fn image_jxl_decode(i: &Path) -> Result<tempfile::NamedTempFile, Box<dyn Error>>
     Ok(tf_out)
 }
 
-fn image_avif_decode(i: &Path) -> Result<tempfile::NamedTempFile, Box<dyn Error>> {
+fn image_avif_decode(i: &Path) -> BResult<tempfile::NamedTempFile> {
     let tf_out = tempfile::Builder::new().suffix(".png").tempfile()?;
     let outp = std::process::Command::new("avifdec")
         .args(["-d", "8", "--png-compress", "0"])

@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    error::Error,
     ffi::OsStr,
     fs::File,
     io::Write,
@@ -12,7 +11,7 @@ use clap::Args;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
-use crate::{csv_output, utils};
+use crate::{csv_output, utils, BResult};
 
 type BytesIO = Vec<u8>;
 
@@ -52,7 +51,7 @@ pub struct Opt {
     nproc_cmd: Option<usize>,
 }
 
-pub fn main(mut opt: Opt) -> Result<(), Box<dyn Error>> {
+pub fn main(mut opt: Opt) -> BResult<()> {
     if opt.tolerance.len() != opt.cmds.len() {
         if opt.tolerance.len() != 1 {
             return Err("Incorrect number of tolerances \
@@ -105,7 +104,7 @@ pub fn process_image(
     img: &Path,
     opt: &Opt,
     settings: &HashMap<String, EncodeSetting>,
-) -> Result<String, Box<dyn Error + Send + Sync>> {
+) -> BResult<String> {
     let img_filesize = img.metadata()?.len() as usize;
     let tolerance = &opt.tolerance; // %
     let out_dir = &opt.out_dir;
@@ -276,7 +275,7 @@ impl ImageBuffer {
         self.encoder.to_string()
     }
 
-    pub fn image_generate(&mut self, img_path: &Path) -> Result<(), Box<dyn Error + Send + Sync>> {
+    pub fn image_generate(&mut self, img_path: &Path) -> BResult<()> {
         let time_start = std::time::Instant::now();
         self.gen_from_cmd(img_path)?;
         self.duration = time_start.elapsed();
@@ -342,7 +341,7 @@ pub struct EncodeSetting {
     output_from_stdout: Option<()>,
 }
 
-fn settings_load(file: &Path) -> Result<HashMap<String, EncodeSetting>, Box<dyn Error>> {
+fn settings_load(file: &Path) -> BResult<HashMap<String, EncodeSetting>> {
     if !file.exists() {
         let mut writer = File::create(file)?;
         writer.write_all(

@@ -1,12 +1,9 @@
-use std::{
-    error::Error,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use clap::Args;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
-use crate::utils;
+use crate::{utils, BResult};
 
 #[derive(Args, Debug, Clone)]
 pub struct Opt {
@@ -26,7 +23,7 @@ pub struct Opt {
     nproc: usize,
 }
 
-pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
+pub fn main(opt: Opt) -> BResult<()> {
     let out_dir = std::path::PathBuf::from(unwrap_two(opt.lesser, opt.greater).to_string());
     let images = utils::ims_init(&opt.input, &out_dir, Some(opt.nproc))?;
 
@@ -45,7 +42,7 @@ fn unwrap_two<T>(l: Option<T>, b: Option<T>) -> T {
     }
 }
 
-fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
+fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> BResult<()> {
     let img_filesize = img.metadata()?.len();
     let img_dimensions = image::image_dimensions(img)?;
     let px_count = img_dimensions.0 * img_dimensions.1;

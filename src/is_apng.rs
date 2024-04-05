@@ -1,6 +1,5 @@
 use std::{
-    error::Error,
-    io::{BufRead, BufReader, Read, Seek},
+    io::{BufReader, Read, Seek},
     path::PathBuf,
 };
 

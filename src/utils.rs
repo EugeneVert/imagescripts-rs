@@ -1,10 +1,11 @@
-use std::{error::Error, path::PathBuf};
+use crate::BResult;
+use std::path::PathBuf;
 
 pub fn ims_init(
     input: &[PathBuf],
     output_dir: &std::path::Path,
     nproc: Option<usize>,
-) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+) -> BResult<Vec<PathBuf>> {
     let mut images = input.to_owned();
     if images[0].to_string_lossy() == "./*" {
         images = read_cwd()?;
@@ -19,7 +20,7 @@ pub fn ims_init(
     Ok(images)
 }
 
-pub fn mkdir(dir: &std::path::Path) -> Result<(), std::string::String> {
+pub fn mkdir(dir: &std::path::Path) -> Result<(), String> {
     if !dir.exists() {
         match std::fs::create_dir_all(dir) {
             Ok(_) => return Ok(()),

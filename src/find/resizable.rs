@@ -1,5 +1,4 @@
 use std::{
-    error::Error,
     ffi::OsStr,
     path::{Path, PathBuf},
 };
@@ -7,7 +6,7 @@ use std::{
 use clap::Args;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
-use crate::utils;
+use crate::{utils, BResult};
 
 #[rustfmt::skip]
 #[derive(Args, Debug, Clone)]
@@ -25,7 +24,7 @@ pub struct Opt {
     nproc: usize,
 }
 
-pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
+pub fn main(opt: Opt) -> BResult<()> {
     let out_dir = Path::new("./").join(opt.px_size.to_string());
     let images = utils::ims_init(&opt.input, &out_dir, Some(opt.nproc))?;
     let images_to_mv = get_images_to_mv(&images, &opt);
@@ -64,7 +63,7 @@ fn get_images_to_mv(images: &[PathBuf], opt: &Opt) -> Vec<PathBuf> {
         .collect()
 }
 
-fn is_image_to_move(image: &Path, opt: &Opt) -> Result<bool, Box<dyn Error>> {
+fn is_image_to_move(image: &Path, opt: &Opt) -> image::ImageResult<bool> {
     let img_dimmensions = image::image_dimensions(image)?;
     if img_dimmensions.0 > opt.px_size || img_dimmensions.1 > opt.px_size {
         Ok(true)

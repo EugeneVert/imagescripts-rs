@@ -1,11 +1,8 @@
-use std::{
-    error::Error,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use clap::Args;
 
-use crate::utils;
+use crate::{utils, BResult};
 
 use super::ffmpeg_demuxer_create_from_files;
 
@@ -16,7 +13,7 @@ pub struct Opt {
     input: Vec<PathBuf>,
 }
 
-pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
+pub fn main(opt: Opt) -> BResult<()> {
     let mut images = opt.input;
     if images[0].to_string_lossy() == "./*" {
         images = utils::read_cwd()?;

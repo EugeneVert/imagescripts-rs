@@ -1,13 +1,14 @@
 // Based on jpegquality by Neal Krawetz
 
 use std::{
-    error::Error,
     fs::File,
     io::{BufReader, Bytes, Read},
     path::Path,
 };
 
-pub fn jpeg_quality(filepath: &Path) -> Result<f32, Box<dyn Error>> {
+use crate::BResult;
+
+pub fn jpeg_quality(filepath: &Path) -> BResult<f32> {
     let file = std::fs::File::open(filepath)?;
     let mut reader = std::io::BufReader::new(file).bytes();
 

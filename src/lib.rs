@@ -1,3 +1,5 @@
+use std::error::Error;
+
 pub mod find {
     pub mod bpp;
     pub mod detailed;
@@ -14,3 +16,5 @@ pub mod jpegquality;
 pub mod utils;
 
 pub mod args;
+
+pub type BResult<T> = std::result::Result<T, Box<dyn Error + Sync + Send + 'static>>;

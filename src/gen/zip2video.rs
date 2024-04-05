@@ -1,6 +1,8 @@
-use std::{collections::HashMap, error::Error, ffi::OsStr, path::PathBuf};
+use std::{collections::HashMap, ffi::OsStr, path::PathBuf};
 
 use clap::Args;
+
+use crate::BResult;
 
 use super::{ffmpeg_demuxer_create_from_json, ffmpeg_run, VideoOpts};
 
@@ -27,7 +29,7 @@ pub struct Opt {
     two_pass: Option<bool>,
 }
 
-pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
+pub fn main(opt: Opt) -> BResult<()> {
     // extract zip to tempdir
     let zip_file = std::fs::File::open(&opt.input)?;
     let mut zip_archive = zip::ZipArchive::new(zip_file)?;
@@ -79,10 +81,7 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
 }
 
 /// Creates ffmpeg demuxer from json file in extracted zip or json from file near zip
-fn animdata2demux(
-    opt: &Opt,
-    tempdir: &tempfile::TempDir,
-) -> Result<Vec<(String, f64)>, Box<dyn Error>> {
+fn animdata2demux(opt: &Opt, tempdir: &tempfile::TempDir) -> BResult<Vec<(String, f64)>> {
     let mut animdata_path = Some(std::path::PathBuf::new());
     animdata_search_in_zip(tempdir, &mut animdata_path)?;
     if animdata_path.is_none() {

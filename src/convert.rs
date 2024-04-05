@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::{error::Error, path::PathBuf};
+use std::path::PathBuf;
 
 use clap::Args;
 use image::{self, DynamicImage, GenericImageView};
@@ -7,9 +7,9 @@ use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefIterator;
 use tempfile::{self, NamedTempFile};
 
-use crate::cmds::ImageBuffer;
-use crate::find::monochrome::image_is_monochrome;
-use crate::jpegquality::jpeg_quality;
+use crate::{
+    cmds::ImageBuffer, find::monochrome::image_is_monochrome, jpegquality::jpeg_quality, BResult,
+};
 
 #[derive(Args, Debug, Clone)]
 pub struct Opt {
@@ -60,7 +60,7 @@ impl Format {
     }
 }
 
-pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
+pub fn main(opt: Opt) -> BResult<()> {
     process_images(
         opt.input,
         opt.output,
@@ -90,7 +90,7 @@ pub fn process_images(
     input_path: PathBuf,
     output_path: PathBuf,
     options: ConvertOptions,
-) -> Result<(), Box<dyn Error>> {
+) -> BResult<()> {
     // LOAD
     let mut format = Format::from_file_format(&input_path).ok_or("Can't parse image format")?;
     let mut img = image::open(&input_path).map_err(|e| {
@@ -288,7 +288,7 @@ pub fn avifenc_q(quality: i8) -> String {
 fn encode_and_get_best(
     input_path: &Path,
     cmds: Vec<(String, &str, bool, i32)>,
-) -> Result<(Vec<u8>, String), Box<dyn Error>> {
+) -> BResult<(Vec<u8>, String)> {
     let img_filesize = std::fs::metadata(input_path)?.len() as usize;
     let mut best = &ImageBuffer::default();
     let mut best_filesize: usize = img_filesize;
@@ -299,7 +299,7 @@ fn encode_and_get_best(
             let mut buff = ImageBuffer::new(&cmd.0, cmd.1, cmd.2);
             buff.image_generate(input_path).map(|_| buff)
         })
-        .collect::<Result<_, _>>()
+        .collect::<std::result::Result<_, _>>()
         .unwrap();
 
     for (i, buff) in enc_img_buffers.iter().enumerate() {
@@ -333,11 +333,7 @@ fn encode_and_get_best(
     Ok((best.image.to_owned(), best.extension.to_string()))
 }
 
-fn process_manga_image(
-    _img: DynamicImage,
-    _input_path: PathBuf,
-    _format: Format,
-) -> Result<(), Box<dyn Error>> {
+fn process_manga_image(_img: DynamicImage, _input_path: PathBuf, _format: Format) -> BResult<()> {
     todo!()
     // if let Some(ncolors) = opt.manga {
     //     let temppath = get_tmp_path(&Format::Png);
@@ -356,7 +352,7 @@ fn process_manga_image(
 //     filepath: &Path,
 //     save_path: &Path,
 //     ncolors: i8,
-// ) -> Result<DynamicImage, Box<dyn Error>> {
+// ) -> BResult<DynamicImage> {
 //     let p = std::process::Command::new("pngquant")
 //         .args(["-o", "-"])
 //         .arg("--nofs")
@@ -380,7 +376,7 @@ fn image_to_grayscale_if_monochrome(
     filepath: PathBuf,
     format: Format,
     monochrome_mse: f32,
-) -> Result<PossibleMonochromeImageBundle, Box<dyn Error>> {
+) -> BResult<PossibleMonochromeImageBundle> {
     if monochrome_mse == -1.0 {
         return Ok((filepath, img, true, None));
     }
@@ -426,7 +422,7 @@ fn ask_is_monochrome(filepath: &Path) -> bool {
     }
 }
 
-fn jpegtran_grayscale(filepath: &Path, save_path: &Path) -> Result<DynamicImage, Box<dyn Error>> {
+fn jpegtran_grayscale(filepath: &Path, save_path: &Path) -> BResult<DynamicImage> {
     let p = std::process::Command::new("jpegtran")
         .arg("-grayscale")
         .arg("-optimize")

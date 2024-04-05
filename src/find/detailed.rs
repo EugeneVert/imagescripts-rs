@@ -1,4 +1,4 @@
-use std::{error::Error, path::PathBuf};
+use std::path::PathBuf;
 
 use clap::Args;
 use image::{
@@ -7,6 +7,8 @@ use image::{
     // ImageResult,
     Luma,
 };
+
+use crate::BResult;
 // use imageproc::definitions::Image;
 
 #[derive(Args, Debug, Clone)]
@@ -22,7 +24,7 @@ pub struct Opt {
     threshold: f32,
 }
 
-pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
+pub fn main(opt: Opt) -> BResult<()> {
     let img = image::open(&opt.input)?;
     if image_is_detailed(&img, opt.threshold) {
         if let (Some(o), Some(n)) = (opt.output, &opt.input.file_name()) {

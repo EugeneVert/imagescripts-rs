@@ -11,7 +11,6 @@ pub struct CsvOutput {
 impl CsvOutput {
     pub fn new(path: &Path) -> csv::Result<Self> {
         let file = fs::OpenOptions::new()
-            .write(true)
             .create(true)
             .append(true)
             .open(path)?;

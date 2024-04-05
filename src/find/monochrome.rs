@@ -1,14 +1,11 @@
 use core::panic;
-use std::{
-    error::Error,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use clap::Args;
 use image::{GenericImageView, Rgb};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
-use crate::utils;
+use crate::{utils, BResult};
 
 #[rustfmt::skip]
 #[derive(Args, Debug, Clone)]
@@ -31,7 +28,7 @@ pub struct Opt {
     test: bool,
 }
 
-pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
+pub fn main(opt: Opt) -> BResult<()> {
     let images = utils::ims_init(&opt.input, opt.out_dir.as_path(), Some(opt.nproc))?;
 
     images.iter().par_bridge().for_each(|img| {
@@ -42,7 +39,7 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
+fn process_image(img: &Path, out_dir: &std::path::Path, opt: &Opt) -> BResult<()> {
     // println!("File: {}", img.display());
     let img_image = image::open(img)?;
 

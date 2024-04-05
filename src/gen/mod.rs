@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    error::Error,
     fs::File,
     io::Write,
     ops::Deref,
@@ -8,6 +7,8 @@ use std::{
 };
 
 use serde::Deserialize;
+
+use crate::BResult;
 
 pub mod ffmpeg_concat;
 pub mod video;
@@ -32,7 +33,7 @@ pub struct VideoOpts {
 }
 
 impl VideoOpts {
-    pub fn new(config_file: &Path) -> Result<VideoOpts, Box<dyn Error>> {
+    pub fn new(config_file: &Path) -> BResult<VideoOpts> {
         if !config_file.exists() {
             let mut writer = File::create(config_file)?;
             writer.write_all(
@@ -170,7 +171,7 @@ pub fn ffmpeg_run(ffmpeg_cmd: &str, filestem: &str, two_pass: bool, container: &
 pub fn ffmpeg_demuxer_create_from_json<T>(
     demuxerf_path: &Path,
     json_mux: &[(String, T)],
-) -> Result<(), Box<dyn Error>>
+) -> BResult<()>
 where
     T: std::fmt::Display,
 {
@@ -185,17 +186,14 @@ where
     Ok(())
 }
 
-pub fn ffmpeg_demuxer_create_from_files(
-    demuxerf_path: &Path,
-    input: &[PathBuf],
-) -> Result<(), Box<dyn Error>> {
+pub fn ffmpeg_demuxer_create_from_files(demuxerf_path: &Path, input: &[PathBuf]) -> BResult<()> {
     let demuxerf = std::fs::File::create(demuxerf_path)?;
     let mut demuxerf = std::io::BufWriter::new(demuxerf);
     demuxerf.write_all(b"ffconcat version 1.0\n")?;
     for i in input {
         demuxerf.write_all((format!("file \'{}\'\n", i.display())).as_bytes())?;
     }
-    demuxerf.write_all((format!("file \'{}\'", &input.last().unwrap().display())).as_bytes())?;
+    // demuxerf.write_all((format!("file \'{}\'", &input.last().unwrap().display())).as_bytes())?;
     demuxerf.flush()?;
     Ok(())
 }

@@ -1,7 +1,6 @@
 use std::{
     cmp::Eq,
     collections::HashMap,
-    error::Error,
     hash::Hash,
     io::BufRead,
     path::{Path, PathBuf},
@@ -9,7 +8,7 @@ use std::{
 
 use clap::Args;
 
-use crate::utils;
+use crate::{utils, BResult};
 
 use super::{ffmpeg_demuxer_create_from_files, ffmpeg_run, VideoOpts};
 
@@ -62,7 +61,7 @@ pub struct Opt {
     round: bool,
 }
 
-pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
+pub fn main(opt: Opt) -> BResult<()> {
     let mut images = opt.input.to_owned();
     if images[0].to_string_lossy() == "./*" {
         images = utils::read_cwd()?;
@@ -131,7 +130,7 @@ pub fn main(opt: Opt) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn get_thumbnail_size(a: &str) -> std::result::Result<(usize, usize), Box<dyn Error>> {
+fn get_thumbnail_size(a: &str) -> BResult<(usize, usize)> {
     if let Some(sizes) = a.split_once('x') {
         return Ok((sizes.0.parse()?, sizes.1.parse()?));
     }
@@ -252,7 +251,7 @@ fn get_video_dimm_from_images(
     Some((w, h))
 }
 
-fn image_dimmesions_exiftool(image: &Path) -> Result<(u32, u32), Box<dyn Error>> {
+fn image_dimmesions_exiftool(image: &Path) -> BResult<(u32, u32)> {
     let output = std::process::Command::new("exiftool")
         .args(["-s3", "-ImageWidth", "-ImageHeight"])
         .arg(image)

@@ -1,9 +1,9 @@
 use clap::{CommandFactory, Parser};
 use clap_complete::{generate, Shell};
 use ims_rs::*;
-use std::{env, error::Error, fs, io};
+use std::{env, fs, io};
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> BResult<()> {
     let opt = args::Opt::parse();
 
     match opt.subcommand {
