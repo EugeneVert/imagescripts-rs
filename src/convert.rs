@@ -111,8 +111,9 @@ pub fn process_images(
     let size = img.dimensions();
     let filepath;
     let mut tmp1 = None;
+    let resize_starting_from = options.resize + options.resize / 100;
     if options.resize != 0
-        && (size.0 > options.resize || size.1 > options.resize)
+        && (size.0 > resize_starting_from || size.1 > resize_starting_from)
         && quality.unwrap_or(100.0) > 90.0
     {
         tmp1 = Some(tempfile::Builder::new().suffix(".png").tempfile()?);
@@ -207,20 +208,20 @@ fn get_encode_settings<'a>(
     jpg_quality: Option<f32>,
     quality_multiplier: f32,
 ) -> Vec<(String, &'a str, bool, i32)> {
-    let avif_normal_quality = (16.0 * quality_multiplier + 0.5) as i8;
+    let avif_normal_quality = (14.0 * quality_multiplier + 0.5) as i8;
     let avif_low_quality = (21.0 * quality_multiplier + 0.5) as i8;
-    let cjxl_hi_quality = 0.7 * quality_multiplier;
-    let cjxl_normal_quality = 1.0 * quality_multiplier;
+    let cjxl_hi_quality = 0.8 * quality_multiplier;
+    let cjxl_normal_quality = 1.125 * quality_multiplier;
     let cjxl_low_quality = 2.0 * quality_multiplier;
     match format {
         Format::Png => match use_avif {
             true => vec![
                 (cjxl_le(7), "jxl", false, 100),
-                (avifenc_q(avif_normal_quality), "avif", false, 42),
+                (avifenc_q(avif_normal_quality), "avif", false, 35),
             ],
             false => vec![
                 (cjxl_le(7), "jxl", false, 100),
-                (cjxl_d(cjxl_hi_quality), "jxl", false, 60),
+                (cjxl_d(cjxl_hi_quality), "jxl", false, 45),
             ],
         },
         Format::Jpeg => match (jpg_quality, use_avif) {
