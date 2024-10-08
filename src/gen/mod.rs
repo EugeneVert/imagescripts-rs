@@ -68,11 +68,11 @@ r#"{
     "args": "-c:v libvpx-vp9 -pix_fmt yuv444p -b:v 0"
   },
   "aom-av1": {
-    "container": "mkv",
+    "container": "webm",
     "args": "-c:v libaom-av1 -pix_fmt yuv444p10le -cpu-used 4 -tile-rows 2 -strict -2 -aq-mode 1 -aom-params enable-chroma-deltaq=1:deltaq-mode=3:qm-min=0:sharpness=2"
   },
   "aom-av1-simple": {
-    "container": "mkv",
+    "container": "webm",
     "args": "-c:v libaom-av1 -pix_fmt yuv444p10le -b:v 0 -cpu-used 4 -tile-rows 2 -strict -2"
   }
 }
@@ -120,7 +120,7 @@ r#"{
                 self.two_pass = p_tp;
             }
             self.args = format!(
-                "{}{} -{} {}",
+                "{}{} -{} {} -fps_mode passthrough",
                 self.args, preset.args, self.quality_slider, quality
             );
         } else {
@@ -181,7 +181,7 @@ where
     for i in json_mux {
         demuxerf.write_all(format!("file \'{}\'\nduration {}\n", i.0, i.1,).as_bytes())?;
     }
-    // demuxerf.write_all(("file ".to_string() + &json_mux.last().unwrap().0 + "\n").as_bytes())?;
+    demuxerf.write_all(("file ".to_string() + &json_mux.last().unwrap().0 + "\n").as_bytes())?;
     demuxerf.flush()?;
     Ok(())
 }
@@ -193,7 +193,7 @@ pub fn ffmpeg_demuxer_create_from_files(demuxerf_path: &Path, input: &[PathBuf])
     for i in input {
         demuxerf.write_all((format!("file \'{}\'\n", i.display())).as_bytes())?;
     }
-    // demuxerf.write_all((format!("file \'{}\'", &input.last().unwrap().display())).as_bytes())?;
+    demuxerf.write_all((format!("file \'{}\'", &input.last().unwrap().display())).as_bytes())?;
     demuxerf.flush()?;
     Ok(())
 }

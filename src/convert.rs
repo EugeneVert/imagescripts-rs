@@ -210,17 +210,17 @@ fn get_encode_settings<'a>(
 ) -> Vec<(String, &'a str, bool, i32)> {
     let avif_normal_quality = (14.0 * quality_multiplier + 0.5) as i8;
     let avif_low_quality = (21.0 * quality_multiplier + 0.5) as i8;
-    let cjxl_hi_quality = 0.8 * quality_multiplier;
+    let cjxl_hi_quality = 1.0 * quality_multiplier;
     let cjxl_normal_quality = 1.125 * quality_multiplier;
     let cjxl_low_quality = 2.0 * quality_multiplier;
     match format {
         Format::Png => match use_avif {
             true => vec![
-                (cjxl_le(7), "jxl", false, 100),
+                (cjxl_l(9), "jxl", false, 100),
                 (avifenc_q(avif_normal_quality), "avif", false, 35),
             ],
             false => vec![
-                (cjxl_le(7), "jxl", false, 100),
+                (cjxl_l(9), "jxl", false, 100),
                 (cjxl_d(cjxl_hi_quality), "jxl", false, 45),
             ],
         },
@@ -234,7 +234,7 @@ fn get_encode_settings<'a>(
             (Some(q), false) if q > 98.0 => {
                 vec![
                     (cjxl_tr(7), "jxl", false, 100),
-                    (cjxl_le(7), "jxl", false, 95),
+                    (cjxl_l(9), "jxl", false, 95),
                     (cjxl_d(cjxl_hi_quality), "jxl", false, 50),
                 ]
             }
@@ -251,7 +251,7 @@ fn get_encode_settings<'a>(
             (_, false) => {
                 vec![
                     (cjxl_tr(7), "jxl", false, 100),
-                    (cjxl_le(7), "jxl", false, 95),
+                    (cjxl_l(9), "jxl", false, 95),
                     (cjxl_d(cjxl_normal_quality), "jxl", false, 50),
                 ]
             }
@@ -260,26 +260,28 @@ fn get_encode_settings<'a>(
     }
 }
 
+#[inline]
 pub fn cjxl_l(effort: i8) -> String {
-    format!("cjxl -d 0 -j -0 -m 1 -e {} --patches=0", effort)
+    format!("cjxl -d 0 -j 0 -e {effort} --patches=0")
 }
 
+#[inline]
 pub fn cjxl_d(distance: f32) -> String {
-    const CJXL_SPEED: i8 = 7;
-    format!(
-        "cjxl -d {} -j 0 -m 0 -e {} --patches=0",
-        distance, CJXL_SPEED
-    )
+    const CJXL_EFFORT: i8 = 7;
+    format!("cjxl -d {distance} -j 0 -e {CJXL_EFFORT} --patches=0")
 }
 
+#[inline]
 pub fn cjxl_tr(effort: i8) -> String {
-    format!("cjxl -d 0 -j 1 -m 0 -e {}", effort)
+    format!("cjxl -d 0 -j 1 -m 0 -e {effort}")
 }
 
-pub fn cjxl_le(effort: i8) -> String {
-    format!("cjxl -d 0 -j 0 -e {} -m 1 -I 1 -E 3 --patches=0", effort)
-}
+// #[inline]
+// pub fn cjxl_le(effort: i8) -> String {
+//     format!("cjxl -d 0 -j 0 -e {} -m 1 -I 1 -E 3 --patches=0", effort)
+// }
 
+#[inline]
 pub fn avifenc_q(quality: i8) -> String {
     const AVIFENC_SPEED: i8 = 4;
     format!("avifenc --min 0 --max 63 -d 10 -s {} -j 8 -a end-usage=q -a cq-level={} -a color:enable-chroma-deltaq=1 -a color:deltaq-mode=3 -a tune=ssim", AVIFENC_SPEED, quality)

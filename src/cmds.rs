@@ -375,11 +375,11 @@ r#"{
     "ext": "avif"
   },
   "avif_q": {
-    "encode": "avifenc --min 0 --max 63 -d 10 -s %1% -j 8 -a end-usage=q -a cq-level=%2% -a color:enable-chroma-deltaq=1 -a color:deltaq-mode=3 -a tune=ssim",
+    "encode": "avifenc --min 1 --max 63 -d 10 -s %1% -j all -a end-usage=q -a cq-level=%2% -a color:deltaq-mode=3 -a tune=ssim",
     "ext": "avif"
   },
   "avif8_q": {
-    "encode": "avifenc --min 0 --max 63 -d 8 -s %1% -j 8 -a end-usage=q -a cq-level=%2% -a color:enable-chroma-deltaq=1 -a color:deltaq-mode=3 -a tune=butteraugli",
+    "encode": "avifenc --min 1 --max 63 -d 8 -s %1% -j all -a end-usage=q -a cq-level=%2% -a color:deltaq-mode=3 -a tune=butteraugli",
     "ext": "avif"
   }
 }"#.as_bytes()
